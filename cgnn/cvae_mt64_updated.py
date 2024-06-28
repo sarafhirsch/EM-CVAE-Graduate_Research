@@ -397,8 +397,8 @@ class CVAE(Model):
         print('d_res1', d_res[..., :self.n_time].shape)
         print('d_res2', d_res[..., self.n_time:].shape)
         # Why? I don't need to do this - for complex values
-        data = np.stack((d_res[..., :7],
-                         d_res[..., 8:]), axis=-1)
+        print('d_res',d_res)
+        data = d_res
         plot_lines(data, save2file=save2file, filename=filename, step=step,
                    ylims=ylims, times=self.times,
                    legend_labels=['real residual', 'imaginary residual'])
