@@ -1,0 +1,9 @@
+[ ] Plot well locations
+[ ] Split off test group by location
+[X] Try log(-data) as input, possibly shifted, or other transform
+[ ] Deal with missing near-surface conductivities
+[ ] Mask NaNs, train on full dataset
+[ ] Include WYO logs
+[ ] Test on BC MT data
+[ ] Try multiple channels - other logs
+[ ] 
