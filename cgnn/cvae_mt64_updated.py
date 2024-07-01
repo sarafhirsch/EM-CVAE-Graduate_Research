@@ -386,8 +386,8 @@ class CVAE(Model):
         d_obs = -tf.exp(latent[..., self.latent_dim:])
         d_pre = tf.reshape(self.predict_tanh(tanhs), (samples, self.n_data))
         print('n_data', self.n_data)
-        print('d_obs',d_obs.shape)
-        print('d_pre',d_pre.shape)
+        print('d_obs',d_obs)
+        print('d_pre',d_pre)
         # print(self.data_std.flatten())
         if weighted:
             d_res = -tf.abs(d_obs - d_pre)*self.data_std.flatten()[None, :]
