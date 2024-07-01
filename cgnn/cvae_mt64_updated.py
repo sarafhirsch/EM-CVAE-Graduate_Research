@@ -398,7 +398,7 @@ class CVAE(Model):
         print('d_res2', d_res[..., self.n_time:].shape)
         # Why? I don't need to do this - for complex values
         print('d_res',d_res)
-        data = d_res
+        data = d_res[...,:self.n_time]
         plot_lines(data, save2file=save2file, filename=filename, step=step,
                    ylims=ylims, times=self.times,
                    legend_labels=['real residual', 'imaginary residual'])
