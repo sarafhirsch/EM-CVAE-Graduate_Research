@@ -64,15 +64,7 @@ def forward_vec_freq(EM,con):
         '''
         if len(con) == 32:
             con = np.delete(con,[-2,-1])
-#     if len(con) == 28:
-#         con = np.append(con, [1])
-    # print(len(con))
-#     print(len(thicknesses))
    
-        n = len(con)
-        # assert len(thicknesses)==n-1, 'con and thicknesses must be same length'
-
-    # points = len(con
         dpred_conductive = EM.dpred(con)
         return dpred_conductive
 
