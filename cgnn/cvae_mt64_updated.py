@@ -77,6 +77,8 @@ class CVAE(Model):
         self.data_shift = data_shift
         self.data_scale = data_scale
 
+        self.EM = mt.EM(times=self.times,thicknesses = self.thicknesses)
+
         if model_loss_type == 'se':
             self.model_mean_error = MeanSquaredError(
                 reduction=Reduction.NONE)
@@ -412,7 +414,6 @@ def forward_np(x, thicknesses, times):
     '''
     Use numpy for forward modeling, return tensorflow object
     '''
-    EM = mt.EM()
     nb = x.shape[0]
     nc = x.shape[1]
     nt = len(times)
@@ -424,7 +425,7 @@ def forward_np(x, thicknesses, times):
     print('xn', xn.shape)
     for ic, c in enumerate(xn):
         # print('EM', EM.forward_vec_freq(c,thicknesses,times))
-        Zss[ic, :] = EM.forward_vec_freq(c, thicknesses, times)
+        Zss[ic, :] = EM.forward_vec_freq(c)
     # Rs = np.real(Zss)
     # Is = np.imag(Zss)
     # data_array = np.c_[Rs, Is]

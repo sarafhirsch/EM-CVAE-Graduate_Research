@@ -10,7 +10,7 @@ from SimPEG.electromagnetics.utils.em1d_utils import ColeCole, LogUniform
 
 class EM:
     def __init__(self, source_location = np.array([0.0, 0.0, 120]), source_orientation = "z", current_amplitude = 1.0, source_radius = 10.0,
-              receiver_location = np.array([0.0, 0.0, 120]), receiver_orientation = "z"):
+              receiver_location = np.array([0.0, 0.0, 120]), receiver_orientation = "z", times=None, thicknesses=None):
         # super(EM, self).__init__()
         eps = 1e-6
         ramp_on = np.r_[0.007-eps, 0.007]
@@ -26,27 +26,6 @@ class EM:
         self.receiver_location = receiver_location
         self.receiver_orientation = receiver_orientation  # "x", "y" or "z"
 
-    def forward_vec_freq(self, con, thicknesses, times):
-        '''
-        Compute 1D isotropic MT response
-        Return Zxy at each interface
-        con is an array of conductivities of length n, in S/m
-        thicknesses is an array of thicknesses of length n-1, in m
-        freqs is an array of frequencies, in Hz
-        Note: in 1D isotropic, Zyx = -Zxy, Zxx=Zyy=0
-        TODO: use cumsum to speed up even more
-        '''
-        if len(con) == 32:
-            con = np.delete(con,[-2,-1])
-#     if len(con) == 28:
-#         con = np.append(con, [1])
-    # print(len(con))
-#     print(len(thicknesses))
-   
-        n = len(con)
-        assert len(thicknesses)==n-1, 'con and thicknesses must be same length'
-
-    # Receiver list
         receiver_list = []
         receiver_list.append(
             tdem.receivers.PointMagneticFluxDensity(
@@ -72,23 +51,29 @@ class EM:
     # Simulate response for static conductivity
         simulation_conductive = tdem.Simulation1DLayered(
             survey=survey, thicknesses=thicknesses, sigmaMap=model_mapping)
+
+    def forward_vec_freq(self, con):
+        '''
+        Compute 1D isotropic MT response
+        Return Zxy at each interface
+        con is an array of conductivities of length n, in S/m
+        thicknesses is an array of thicknesses of length n-1, in m
+        freqs is an array of frequencies, in Hz
+        Note: in 1D isotropic, Zyx = -Zxy, Zxx=Zyy=0
+        TODO: use cumsum to speed up even more
+        '''
+        if len(con) == 32:
+            con = np.delete(con,[-2,-1])
+#     if len(con) == 28:
+#         con = np.append(con, [1])
+    # print(len(con))
+#     print(len(thicknesses))
+   
+        n = len(con)
+        # assert len(thicknesses)==n-1, 'con and thicknesses must be same length'
+
     # points = len(con
         dpred_conductive = simulation_conductive.dpred(con)
-        # print('dpred', dpred_conductive.shape)
-    # print('dpred_conductive', dpred_conductive.shape)
-    # omega = 2*np.pi*freqs
-    # alpha = np.sqrt(1j*mu0*np.outer(omega, con))
-    # tanh_ad = np.tanh(alpha[:, :-1] * thicknesses[None, :])
-    # ac_tanh_ad = alpha[:, :-1]/con[None, :-1]*tanh_ad
-    # ca_tanh_ad = con[None, :-1]/alpha[:, :-1]*tanh_ad
-    # Z = 1j*np.zeros(alpha.shape)
-    # Z[:, -1] = -alpha[:, -1]/con[-1]
-    # # iterate from next to last layer up to first layer
-    # for ii in range(n-2,-1,-1):
-    #     # Z[:, ii] = ((Z[:, ii+1] - alpha[:, ii]/con[ii]*tanh_ad[:, ii]) /
-    #     #             (1 - con[ii]/alpha[:, ii]*Z[:, ii+1]*tanh_ad[:, ii]))
-    #     Z[:, ii] = ((Z[:, ii+1] - ac_tanh_ad[:, ii]) /
-    #                 (1 - ca_tanh_ad[:, ii]*Z[:, ii+1]))
         return dpred_conductive
 
 
