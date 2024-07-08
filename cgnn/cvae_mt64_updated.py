@@ -22,8 +22,8 @@ from tensorflow.keras.layers import (InputLayer, Dense, Flatten, Reshape,
                                      Conv1D, Conv1DTranspose)
 
 # from .mt1d import forward_1_freq, gradient_Z_1_freq, gradient_Z_con_1_freq
-from cgnn import mt1d_updated as mt
-# from .mt1d_updated import forward_vec_freq, gradient_Z, gradient_Z_con
+# from cgnn import mt1d_updated
+from .mt1d_updated import EM, forward_vec_freq, gradient_Z, gradient_Z_con
 
 
 class ElapsedTimer(object):
@@ -77,7 +77,8 @@ class CVAE(Model):
         self.data_shift = data_shift
         self.data_scale = data_scale
 
-        self.EM = mt.EM(times=self.times,thicknesses = self.thicknesses)
+        self.simulation = EM(times=self.times,thicknesses = self.thicknesses)
+        print(self.simulation)
 
         if model_loss_type == 'se':
             self.model_mean_error = MeanSquaredError(
@@ -275,7 +276,31 @@ class CVAE(Model):
         else:
             # return d_input + noise
             return d_input*(1 + noise)
-
+        
+    def forward_np(self, x, thicknesses, times):
+        '''
+        Use numpy for forward modeling, return tensorflow object
+        '''
+        nb = x.shape[0]
+        nc = x.shape[1]
+        nt = len(times)
+        print('nc', nc)
+        xn = tf.reshape(x, (-1, nc)).numpy()
+        Zss = np.zeros((nb, 30))
+        print('Zss', Zss.shape)
+        ic = 0
+        print('xn', xn.shape)
+        for ic, c in enumerate(xn):
+            # print('EM', EM.forward_vec_freq(c,thicknesses,times))
+            Zss[ic, :] = forward_vec_freq(self.simulation, c)
+        # Rs = np.real(Zss)
+        # Is = np.imag(Zss)
+        # data_array = np.c_[Rs, Is]
+        data_array = Zss
+        print('Zss', Zss)
+        print(data_array)
+        return tf.cast(data_array, tf.float32)
+    
     @tf.custom_gradient
     def predict_data(self, model):
         '''
@@ -288,7 +313,7 @@ class CVAE(Model):
         https://stackoverflow.com/questions/58223640/custom-activation-with-custom-gradient-does-not-work
         '''
         ys = tf.numpy_function(
-            forward_np, [model, self.thicknesses, self.times],
+            self.forward_np, [model, self.thicknesses, self.times],
             model.dtype)
 #         print(self.frequencies.shape)
 #         print(self.thicknesses.shape)
@@ -410,29 +435,7 @@ class CVAE(Model):
 
 # Use numpy's complex numbers, because TF seems to be very slow
 # https://stackoverflow.com/a/63583413/14134052
-def forward_np(x, thicknesses, times):
-    '''
-    Use numpy for forward modeling, return tensorflow object
-    '''
-    nb = x.shape[0]
-    nc = x.shape[1]
-    nt = len(times)
-    print('nc', nc)
-    xn = tf.reshape(x, (-1, nc)).numpy()
-    Zss = np.zeros((nb, 30))
-    print('Zss', Zss.shape)
-    ic = 0
-    print('xn', xn.shape)
-    for ic, c in enumerate(xn):
-        # print('EM', EM.forward_vec_freq(c,thicknesses,times))
-        Zss[ic, :] = EM.forward_vec_freq(c)
-    # Rs = np.real(Zss)
-    # Is = np.imag(Zss)
-    # data_array = np.c_[Rs, Is]
-    data_array = Zss
-    print('Zss', Zss)
-    print(data_array)
-    return tf.cast(data_array, tf.float32)
+
 
 
 def gradient_np(x, y, dy, thicknesses, times):

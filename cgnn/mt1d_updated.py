@@ -8,51 +8,51 @@ from SimPEG.utils import plot_1d_layer_model
 from SimPEG.electromagnetics.utils.em1d_utils import ColeCole, LogUniform
 
 
-class EM:
-    def __init__(self, source_location = np.array([0.0, 0.0, 120]), source_orientation = "z", current_amplitude = 1.0, source_radius = 10.0,
-              receiver_location = np.array([0.0, 0.0, 120]), receiver_orientation = "z", times=None, thicknesses=None):
+def EM(times, thicknesses):
         # super(EM, self).__init__()
         eps = 1e-6
         ramp_on = np.r_[0.007-eps, 0.007]
         ramp_off = np.r_[0.02,0.02+eps]
-        self.waveform = tdem.sources.TrapezoidWaveform(
+        waveform = tdem.sources.TrapezoidWaveform(
                     ramp_on=ramp_on, ramp_off=ramp_off)
 
-        self.source_location = source_location
-        self.source_orientation = source_orientation   # "x", "y" or "z"
-        self.current_amplitude = current_amplitude  # maximum amplitude of source current
-        self.source_radius = source_radius  # loop radius
+        source_location = np.array([0.0, 0.0, 120])
+        source_orientation = "z"   # "x", "y" or "z"
+        current_amplitude = 1.0  # maximum amplitude of source current
+        source_radius = 10.0  # loop radius
 
-        self.receiver_location = receiver_location
-        self.receiver_orientation = receiver_orientation  # "x", "y" or "z"
+        receiver_location = np.array([0.0, 0.0, 120])
+        receiver_orientation = "z"  # "x", "y" or "z"
 
         receiver_list = []
         receiver_list.append(
             tdem.receivers.PointMagneticFluxDensity(
-                self.receiver_location, times, orientation=self.receiver_orientation))
+                receiver_location, times, orientation=receiver_orientation))
         receiver_list.append(
             tdem.receivers.PointMagneticFluxTimeDerivative(
-                self.receiver_location, times, orientation=self.receiver_orientation))
+                receiver_location, times, orientation=receiver_orientation))
 
     # Sources
         source_list = [
             tdem.sources.CircularLoop(
                 receiver_list=receiver_list,
-                location=self.source_location,
-                waveform=self.waveform,
-                current=self.current_amplitude,
-                radius=self.source_radius,)]
+                location=source_location,
+                waveform=waveform,
+                current=current_amplitude,
+                radius=source_radius,)]
 
     # Survey
         survey = tdem.Survey(source_list)
 
-        model_mapping = maps.IdentityMap(nP=n)
+        model_mapping = maps.IdentityMap(nP=30)
 
     # Simulate response for static conductivity
         simulation_conductive = tdem.Simulation1DLayered(
             survey=survey, thicknesses=thicknesses, sigmaMap=model_mapping)
+        
+        return simulation_conductive
 
-    def forward_vec_freq(self, con):
+def forward_vec_freq(EM,con):
         '''
         Compute 1D isotropic MT response
         Return Zxy at each interface
@@ -73,11 +73,11 @@ class EM:
         # assert len(thicknesses)==n-1, 'con and thicknesses must be same length'
 
     # points = len(con
-        dpred_conductive = simulation_conductive.dpred(con)
+        dpred_conductive = EM.dpred(con)
         return dpred_conductive
 
 
-    def forward(con, thicknesses, freqs):
+def forward(con, thicknesses, freqs):
         '''
         Wrapper for forward calcs
         Only return Zxy at surface
@@ -87,7 +87,7 @@ class EM:
         return Zs
 
 
-    def forward_1_freq(con, thicknesses, freq):
+def forward_1_freq(con, thicknesses, freq):
         '''
         Compute 1D isotropic MT response
         Return Zxy at each interface
