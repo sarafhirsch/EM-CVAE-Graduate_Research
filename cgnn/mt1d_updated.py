@@ -53,15 +53,6 @@ def EM(times, thicknesses):
         return simulation_conductive
 
 def forward_vec_freq(EM,con):
-        '''
-        Compute 1D isotropic MT response
-        Return Zxy at each interface
-        con is an array of conductivities of length n, in S/m
-        thicknesses is an array of thicknesses of length n-1, in m
-        freqs is an array of frequencies, in Hz
-        Note: in 1D isotropic, Zyx = -Zxy, Zxx=Zyy=0
-        TODO: use cumsum to speed up even more
-        '''
         if len(con) == 32:
             con = np.delete(con,[-2,-1])
 
