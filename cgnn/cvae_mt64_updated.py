@@ -23,7 +23,7 @@ from tensorflow.keras.layers import (InputLayer, Dense, Flatten, Reshape,
 
 # from .mt1d import forward_1_freq, gradient_Z_1_freq, gradient_Z_con_1_freq
 # from cgnn import mt1d_updated
-from .mt1d_updated import EM, forward_vec_freq, gradient_Z, gradient_Z_con
+from .mt1d_updated import EM, forward_vec_freq, gradient
 
 
 class ElapsedTimer(object):
@@ -284,12 +284,12 @@ class CVAE(Model):
         nb = x.shape[0]
         nc = x.shape[1]
         nt = len(times)
-        print('nc', nc)
+        # print('nc', nc)
         xn = tf.reshape(x, (-1, nc)).numpy()
         Zss = np.zeros((nb, 30))
-        print('Zss', Zss.shape)
+        # print('Zss', Zss.shape)
         ic = 0
-        print('xn', xn.shape)
+        # print('xn', xn.shape)
         for ic, c in enumerate(xn):
             # print('EM', EM.forward_vec_freq(c,thicknesses,times))
             Zss[ic, :] = forward_vec_freq(self.simulation, c)
@@ -297,9 +297,63 @@ class CVAE(Model):
         # Is = np.imag(Zss)
         # data_array = np.c_[Rs, Is]
         data_array = Zss
-        print('Zss', Zss)
-        print(data_array)
+        # print('Zss', Zss)
+        # print(data_array)
         return tf.cast(data_array, tf.float32)
+    
+    def gradient_np(self, x, y, dy, thicknesses, times):
+        '''
+        Use numpy for gradient, return tensorflow object
+        '''
+        nb = x.shape[0]
+        nc = x.shape[1]
+        nt = len(times)
+        # print(type(x), type(y), type(dy))
+        dd = np.reshape(dy, (-1, 2*nt))#.numpy()
+        # nb = dd.shape[0]
+        # xn = x#.numpy()
+        xn = tf.reshape(x, (-1, nc)).numpy()
+        xn = xn[:,:30]
+        print('xn',xn.shape)
+        # vJp = np.zeros((nb, nc))
+        vJp = np.zeros(x.shape)
+
+        # Zss = y.numpy()[:, :nf, :] + 1j*y.numpy()[:, nf:, :]
+        Zss = y[:, :30]
+        # print('Zss',Zss.shape)
+        for ib, (Zs, c) in enumerate(zip(Zss, xn)):
+            # print('Zs',Zs.shape)
+            # print('c',c.shape)
+            vJp[ib,:30,0] = gradient(self.simulation, c, Zs)
+        # for ib, Zs in enumerate(Zss):
+    #         # Z = forward_vec_freq(c, thicknesses, frequencies)
+    #         dZdZ1 = gradient_Z(Zs, c, thicknesses, times)
+    #         dZidconi = gradient_Z_con(Zs, c, thicknesses, times)
+    #         dZ1dZi = np.cumprod(dZdZ1, axis=1)
+    #         dZdcon = dZidconi
+    #         dZdcon[:, 1:] *= dZ1dZi
+    #         # return dZdcon
+    # #         print(dZdcon.T.shape)
+    # #         print(dd[ib,nf:].shape)
+    # #         print(vJp[ib,:30,0].shape)
+    #         vJp[ib, :30, 0] = (np.dot(np.real(dZdcon.T), dd[ib, :nt]) +
+    #                         np.dot(np.imag(dZdcon.T), dd[ib, nt:]))
+
+
+
+    #       for ifreq, (frequency, Z) in enumerate(zip(frequencies, Zs)):
+    #           #print(Z.shape, c.shape, thicknesses.shape)
+    #           dZdZ1 = gradient_Z_1_freq(Z, c, thicknesses, frequency)
+    #           dZidconi = gradient_Z_con_1_freq(Z, c, thicknesses, frequency)
+    #           dZ1dZi = np.cumprod(dZdZ1)
+    #           dZdcon = dZidconi
+    #           dZdcon[1:] *= dZ1dZi
+    #           # print(vJp.shape, dZdcon.shape, dd.shape)
+    #           vJp[ib, :, 0] += (np.real(dZdcon)*dd[ib, ifreq] +
+    #                             np.imag(dZdcon)*dd[ib, nf + ifreq])
+
+        # create a tensorflow array for output
+        return tf.cast(vJp, tf.float32)
     
     @tf.custom_gradient
     def predict_data(self, model):
@@ -322,14 +376,15 @@ class CVAE(Model):
         # Why?
         ys_test = ys[..., 0]
         print('ys_test', ys_test.shape)
-        def mt_grad(ddata):
+        def tdem_grad(ddata):
             '''
             Return J^T ddata
             '''
+            # gradient(self.simulation,model,ddata)
             return tf.numpy_function(
-                gradient_np, [model, ys, ddata, self.thicknesses, self.times],
+                self.gradient_np, [model, ys, ddata, self.thicknesses, self.times],
                 model.dtype)
-        return ys, mt_grad
+        return ys, tdem_grad
 
     # def predict_log(self, logs):
     #     '''
@@ -427,68 +482,13 @@ class CVAE(Model):
         print('d_res',d_res)
         data = d_res[...,:self.n_time]
         plot_lines(data, save2file=save2file, filename=filename, step=step,
-                   ylims=ylims, times=self.times,
-                   legend_labels=['real residual', 'imaginary residual'])
+                   ylims=ylims, times=self.times)
 
 
 
 
 # Use numpy's complex numbers, because TF seems to be very slow
 # https://stackoverflow.com/a/63583413/14134052
-
-
-
-def gradient_np(x, y, dy, thicknesses, times):
-    '''
-    Use numpy for gradient, return tensorflow object
-    '''
-    nb = x.shape[0]
-    nc = x.shape[1]
-    nt = len(times)
-    # print(type(x), type(y), type(dy))
-    dd = np.reshape(dy, (-1, 2*nt))#.numpy()
-    # nb = dd.shape[0]
-    # xn = x#.numpy()
-    xn = tf.reshape(x, (-1, nc)).numpy()
-    # vJp = np.zeros((nb, nc))
-    vJp = np.zeros(x.shape)
-
-    # Zss = y.numpy()[:, :nf, :] + 1j*y.numpy()[:, nf:, :]
-    Zss = y[:, :nt, :] + 1j*y[:, nt:, :]
-
-    for ib, (Zs, c) in enumerate(zip(Zss, xn)):
-    # for ib, Zs in enumerate(Zss):
-
-
-        # Z = forward_vec_freq(c, thicknesses, frequencies)
-        dZdZ1 = gradient_Z(Zs, c, thicknesses, times)
-        dZidconi = gradient_Z_con(Zs, c, thicknesses, times)
-        dZ1dZi = np.cumprod(dZdZ1, axis=1)
-        dZdcon = dZidconi
-        dZdcon[:, 1:] *= dZ1dZi
-        # return dZdcon
-#         print(dZdcon.T.shape)
-#         print(dd[ib,nf:].shape)
-#         print(vJp[ib,:30,0].shape)
-        vJp[ib, :30, 0] = (np.dot(np.real(dZdcon.T), dd[ib, :nt]) +
-                         np.dot(np.imag(dZdcon.T), dd[ib, nt:]))
-
-
-
-#       for ifreq, (frequency, Z) in enumerate(zip(frequencies, Zs)):
-#           #print(Z.shape, c.shape, thicknesses.shape)
-#           dZdZ1 = gradient_Z_1_freq(Z, c, thicknesses, frequency)
-#           dZidconi = gradient_Z_con_1_freq(Z, c, thicknesses, frequency)
-#           dZ1dZi = np.cumprod(dZdZ1)
-#           dZdcon = dZidconi
-#           dZdcon[1:] *= dZ1dZi
-#           # print(vJp.shape, dZdcon.shape, dd.shape)
-#           vJp[ib, :, 0] += (np.real(dZdcon)*dd[ib, ifreq] +
-#                             np.imag(dZdcon)*dd[ib, nf + ifreq])
-
-    # create a tensorflow array for output
-    return tf.cast(vJp, tf.float32)
-
 
 def plot_log(ax, log, depths=None):
     if depths is None:
@@ -576,7 +576,7 @@ def plot_lines(data, save2file=False, filename='./data.png', step=None,
         if times is None:
             ax.semilogy(data_i)
         else:
-            ax.loglog(times, data_i)
+            ax.loglog(times, data_i[:15])
         plt.ylim(*ylims)
         if i%subplot_cols > 0:
             ax.axes.yaxis.set_ticks([])
@@ -721,8 +721,8 @@ def compute_apply_gradients(network, xy, optimizer, use_data_misfit=True, rel_no
     with tf.GradientTape() as tape:
         if use_data_misfit:
             print('loss')
-            print(network)
-            print(xy)
+            print('network',network)
+            print('xy',xy)
             loss, terms = compute_loss(network, xy, rel_noise=rel_noise)
         else:
             print('reconstrauction')
