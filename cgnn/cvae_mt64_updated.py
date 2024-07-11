@@ -455,7 +455,7 @@ class CVAE(Model):
                    legend_labels=['obs','pre'],x_label='Times (s)', y_label='Conductivity')
 
     def plot_residuals(self, save2file=False, folder='.', samples=16,
-                       latent=None, step=None, ylims=(1e-40, 1e-19),
+                       latent=None, step=None, ylims=(1e-25, 1e-10),
                        weighted=True):
         '''
         Plot data residuals;
