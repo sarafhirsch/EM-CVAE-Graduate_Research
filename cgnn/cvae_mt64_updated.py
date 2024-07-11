@@ -430,7 +430,7 @@ class CVAE(Model):
                  filename=filename, step=step, depths=self.depths)
 
     def plot_data(self, save2file=False, folder='.', samples=16,
-                  latent=None, step=None, ylims=(1e-6, 1e-2)):
+                  latent=None, step=None, ylims=(1e-25, 1e-11)):
         if latent is None:
             latent = np.random.normal(
                 0.0, 1.0, size=[samples, self.latent_dim+self.n_data])
@@ -438,19 +438,24 @@ class CVAE(Model):
             filename = folder+"/data.png"
         else:
             filename = folder+"/data_%05d.png" % step
+        print('latent',latent)
         tanhs = self.decode(latent, apply_tanh=True)
         samples = tanhs.shape[0]
-        d_obs = -tf.exp(latent[..., self.latent_dim:])
-#         print(self.predict_tanh(tanhs).shape)
-        d_pre = tf.reshape(self.predict_tanh(tanhs), (samples, self.n_data))
+        d_obs = -(latent[..., self.latent_dim:])
+        print('d_obs',d_obs)
+        d_pre = -tf.reshape(self.predict_tanh(tanhs), (samples, self.n_data))
+        print('d_pre',d_pre)
         data = np.stack((d_obs[..., :self.n_time],
                         d_pre[..., :self.n_time:]), axis=-1)
+        # data = d_pre[...,:self.n_time]
+        print('data',data)
+        # print('data min', data.min)
         plot_lines(data, save2file=save2file, filename=filename, step=step,
                    ylims=ylims, times=self.times,
-                   legend_labels=['obs real', 'pre real'])
+                   legend_labels=['obs','pre'],x_label='Times (s)', y_label='Conductivity')
 
     def plot_residuals(self, save2file=False, folder='.', samples=16,
-                       latent=None, step=None, ylims=(1e-6, 1e-1),
+                       latent=None, step=None, ylims=(1e-40, 1e-19),
                        weighted=True):
         '''
         Plot data residuals;
@@ -465,8 +470,8 @@ class CVAE(Model):
             filename = folder+"/residual_%05d.png" % step
         tanhs = self.decode(latent, apply_tanh=True)
         samples = tanhs.shape[0]
-        d_obs = -tf.exp(latent[..., self.latent_dim:])
-        d_pre = tf.reshape(self.predict_tanh(tanhs), (samples, self.n_data))
+        d_obs = -(latent[..., self.latent_dim:])
+        d_pre = -tf.reshape(self.predict_tanh(tanhs), (samples, self.n_data))
         print('n_data', self.n_data)
         print('d_obs',d_obs)
         print('d_pre',d_pre)
@@ -482,7 +487,7 @@ class CVAE(Model):
         print('d_res',d_res)
         data = d_res[...,:self.n_time]
         plot_lines(data, save2file=save2file, filename=filename, step=step,
-                   ylims=ylims, times=self.times)
+                   ylims=ylims, times=self.times,x_label='Times (s)', y_label='Conductivity')
 
 
 
@@ -561,10 +566,9 @@ def plot_complex(data, **kwargs):
 
 
 def plot_lines(data, save2file=False, filename='./data.png', step=None,
-               ylims=(1e-4, 1), times=None,
-               x_label='frequency, Hz',
-               y_label='$Z_{xy}$',
-               legend_labels=['real', 'imaginary']):
+               ylims=(0, 1000), times=None,
+               x_label='Conductivity, (S/m)',
+               y_label='Depth',legend_labels=None):
     # matplotlib.rc('font', size=14)
     fig = plt.figure(figsize=(14, 10))
     samples = data.shape[0]
