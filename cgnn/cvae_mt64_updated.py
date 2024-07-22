@@ -647,18 +647,18 @@ def compute_loss(network, xy, rel_noise=0):
 #     x_tanh2 = torch.tensor()
     dim = x.shape[0]
     x_tanh1 = tf.slice(x_tanh, [0,0,0], [dim,30,1])
-    print('network n_model:',network.n_model-2)
-    print('x_tanh:',x_tanh1.shape)
-    print(x_tanh[0])
-    print(x_tanh1[0])
-    print('x:',x.shape)
-    print('x_tanh tensor:',tf.transpose(tf.reshape(x_tanh1, (-1, network.n_model-2))))
-    print('x tensor:',tf.transpose(tf.reshape(x, (-1, network.n_model-2))))
+    # print('network n_model:',network.n_model-2)
+    # print('x_tanh:',x_tanh1.shape)
+    # print(x_tanh[0])
+    # print(x_tanh1[0])
+    # print('x:',x.shape)
+    # print('x_tanh tensor:',tf.transpose(tf.reshape(x_tanh1, (-1, network.n_model-2))))
+    # print('x tensor:',tf.transpose(tf.reshape(x, (-1, network.n_model-2))))
     logpx_z = tf.reduce_mean(
         network.model_mean_error(tf.transpose(tf.reshape(x_tanh1, (-1, network.n_model-2))),
                                  tf.transpose(tf.reshape(x, (-1, network.n_model-2))),
                                  sample_weight=network.model_weights))
-    print(logpx_z)
+    # print(logpx_z)
     # logpx_z = tf.losses.mse(x_tanh, x)
     logpx_z = tf.cast(logpx_z, np.float32)
     logpz = tf.reduce_mean(log_normal_pdf(z, 0., 0.))
