@@ -523,6 +523,7 @@ def plot_logs(logs, save2file=False, filename='./model.png', step=None,
     for i in range(logs.shape[0]):
         ax = plt.subplot(subplot_rows, subplot_cols, i+1)
         log = logs[i, ...]
+        ax.title("Sounding %d" % int(i+1))
         if depths is None:
             plt.semilogx(log, np.arange(len(log)))
         else:
