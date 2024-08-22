@@ -411,8 +411,8 @@ class CVAE(Model):
         tanhs = self.decode(latent, apply_tanh=True)
         samples = tanhs.shape[0]
         tanhs = np.reshape(tanhs, (samples, self.n_model))
-        plot_logs(np.exp(self.tanhs_to_model(tanhs)), save2file=save2file,
-                  filename=filename, step=step, depths=self.depths)
+        plot_logs(np.exp(self.tanhs_to_model(tanhs)), save2file=True,
+                  filename=filename, step=16, depths=self.depths)
 
     def overlay_models(self, save2file=False, folder='.', samples=16,
                        latent=None, step=None):
@@ -451,9 +451,9 @@ class CVAE(Model):
         # data = d_pre[...,:self.n_time]
         print('data',data)
         # print('data min', data.min)
-        plot_lines(data, save2file=save2file, filename=filename, step=step,
+        plot_lines(data, save2file=True, filename=filename, step=16,
                    ylims=ylims, times=self.times[1:],
-                   legend_labels=['obs','pre'],x_label='Times (s)', y_label='dB/dt')
+                   legend_labels=['Obs','Pre'],x_label='Times (s)', y_label='dB/dt')
 
     def plot_residuals(self, save2file=False, folder='.', samples=16,
                        latent=None, step=None, ylims=(1e-25, 1e-10),
@@ -523,7 +523,7 @@ def plot_logs(logs, save2file=False, filename='./model.png', step=None,
     for i in range(logs.shape[0]):
         ax = plt.subplot(subplot_rows, subplot_cols, i+1)
         log = logs[i, ...]
-        ax.title("Sounding %d" % int(i+1))
+        ax.set_title("Sounding %d" % int(i+1), fontsize = 16)
         if depths is None:
             plt.semilogx(log, np.arange(len(log)))
         else:
@@ -547,7 +547,7 @@ def plot_logs(logs, save2file=False, filename='./model.png', step=None,
              rotation='vertical', size=20)
     # plt.tight_layout(rect=[0, 0.03, 1, 0.95])
     if step is not None:
-        plt.suptitle('Epoch %d' % step)
+        plt.suptitle('Generated Validation Conductivty Logs')
     if save2file:
         plt.savefig(filename)
         plt.draw()
@@ -579,6 +579,7 @@ def plot_lines(data, save2file=False, filename='./data.png', step=None,
     for i in range(data.shape[0]):
         ax = plt.subplot(subplot_rows, subplot_cols, i+1)
         data_i = -data[i, ...]
+        ax.set_title('Sounding %d' %int(i+1), fontsize = 16)
         if times is None:
             ax.semilogy(data_i)
         else:
@@ -592,10 +593,10 @@ def plot_lines(data, save2file=False, filename='./data.png', step=None,
     fig.text(0.03, 0.5, y_label, ha='center', va='center',
              rotation='vertical', size=20)
     if legend_labels is not None:
-        plt.legend(legend_labels)
+        plt.legend(legend_labels, bbox_to_anchor=(1.02, 0.1), loc='upper left', borderaxespad=0)
     # plt.tight_layout(rect=[0, 0.03, 1, 0.95])
     if step is not None:
-        plt.suptitle('Epoch %d' % step)
+        plt.suptitle("Time Decay Curves")
     if save2file:
         plt.savefig(filename)
         plt.draw()
