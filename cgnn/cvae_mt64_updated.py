@@ -314,7 +314,7 @@ class CVAE(Model):
         # xn = x#.numpy()
         xn = tf.reshape(x, (-1, nc)).numpy()
         xn = xn[:,:30]
-        print('xn',xn.shape)
+        # print('xn',xn.shape)
         # vJp = np.zeros((nb, nc))
         vJp = np.zeros(x.shape)
 
