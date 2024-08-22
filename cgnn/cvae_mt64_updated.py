@@ -511,7 +511,7 @@ def plot_log(ax, log, depths=None):
 
 
 def plot_logs(logs, save2file=False, filename='./model.png', step=None,
-              xlims=(1e-2, 1e3), depths=None,
+              xlims=(2e-2, 2e3), depths=None,
               x_label='Conductivity, S/m',
               y_label='Depth, m'
              ):
