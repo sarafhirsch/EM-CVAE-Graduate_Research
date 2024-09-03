@@ -44,7 +44,7 @@ def EM(times, thicknesses):
     # Survey
         survey = tdem.Survey(source_list)
 
-        model_mapping = maps.IdentityMap(nP=30)
+        model_mapping = maps.IdentityMap(nP=32)
 
     # Simulate response for static conductivity
         simulation_conductive = tdem.Simulation1DLayered(
@@ -53,8 +53,8 @@ def EM(times, thicknesses):
         return simulation_conductive
 
 def forward_vec_freq(EM,con):
-        if len(con) == 32:
-            con = np.delete(con,[-2,-1])
+        # if len(con) == 32:
+            # con = np.delete(con,[-2,-1])
 
         dpred_conductive = EM.dpred(con)
         return dpred_conductive

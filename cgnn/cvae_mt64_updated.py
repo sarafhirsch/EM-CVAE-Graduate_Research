@@ -54,7 +54,8 @@ class CVAE(Model):
 
         self.depths = depths
         self.thicknesses = depths - np.r_[0, depths[:-1]]
-        n_model = len(depths)+3
+        print(self.thicknesses.shape)
+        n_model = len(depths)+1
         self.n_model = n_model
         self.channels = channels
         self.latent_dim = latent_dim
@@ -119,7 +120,7 @@ class CVAE(Model):
 
         self.inference_net = Sequential([
             # 64 x 1, depth = 1
-            InputLayer(input_shape=(30, channels)),
+            InputLayer(input_shape=(32, channels)),
             Conv1D(filters=16,
                    kernel_size=3,
                    strides=(2,),
@@ -286,11 +287,12 @@ class CVAE(Model):
         nt = len(times)
         # print('nc', nc)
         xn = tf.reshape(x, (-1, nc)).numpy()
-        Zss = np.zeros((nb, 30))
-        # print('Zss', Zss.shape)
+        Zss = np.zeros((nb, nc))
+        print('Zss', Zss.shape)
         ic = 0
-        # print('xn', xn.shape)
+        print('xn', xn.shape)
         for ic, c in enumerate(xn):
+            print(self.simulation)
             # print('EM', EM.forward_vec_freq(c,thicknesses,times))
             Zss[ic, :] = forward_vec_freq(self.simulation, c)
         # Rs = np.real(Zss)
@@ -649,7 +651,7 @@ def compute_loss(network, xy, rel_noise=0):
     #                             sample_weight=network.data_weights))
 #     x_tanh2 = torch.tensor()
     dim = x.shape[0]
-    x_tanh1 = tf.slice(x_tanh, [0,0,0], [dim,30,1])
+    x_tanh1 = tf.slice(x_tanh, [0,0,0], [dim,32,1])
     # print('network n_model:',network.n_model-2)
     # print('x_tanh:',x_tanh1.shape)
     # print(x_tanh[0])
@@ -658,8 +660,8 @@ def compute_loss(network, xy, rel_noise=0):
     # print('x_tanh tensor:',tf.transpose(tf.reshape(x_tanh1, (-1, network.n_model-2))))
     # print('x tensor:',tf.transpose(tf.reshape(x, (-1, network.n_model-2))))
     logpx_z = tf.reduce_mean(
-        network.model_mean_error(tf.transpose(tf.reshape(x_tanh1, (-1, network.n_model-2))),
-                                 tf.transpose(tf.reshape(x, (-1, network.n_model-2))),
+        network.model_mean_error(tf.transpose(tf.reshape(x_tanh1, (-1, network.n_model))),
+                                 tf.transpose(tf.reshape(x, (-1, network.n_model))),
                                  sample_weight=network.model_weights))
     # print(logpx_z)
     # logpx_z = tf.losses.mse(x_tanh, x)
