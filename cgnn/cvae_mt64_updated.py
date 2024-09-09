@@ -54,7 +54,7 @@ class CVAE(Model):
 
         self.depths = depths
         self.thicknesses = depths - np.r_[0, depths[:-1]]
-        print(self.thicknesses.shape)
+        print('thicknesses',self.thicknesses.shape)
         n_model = len(depths)+1
         self.n_model = n_model
         self.channels = channels
@@ -288,11 +288,8 @@ class CVAE(Model):
         # print('nc', nc)
         xn = tf.reshape(x, (-1, nc)).numpy()
         Zss = np.zeros((nb, nc))
-        print('Zss', Zss.shape)
         ic = 0
-        print('xn', xn.shape)
         for ic, c in enumerate(xn):
-            print(self.simulation)
             # print('EM', EM.forward_vec_freq(c,thicknesses,times))
             Zss[ic, :] = forward_vec_freq(self.simulation, c)
         # Rs = np.real(Zss)
@@ -412,6 +409,7 @@ class CVAE(Model):
             filename = folder+"/model_%05d.png" % step
         tanhs = self.decode(latent, apply_tanh=True)
         samples = tanhs.shape[0]
+        print(tanhs.shape)
         tanhs = np.reshape(tanhs, (samples, self.n_model))
         plot_logs(np.exp(self.tanhs_to_model(tanhs)), save2file=True,
                   filename=filename, step=16, depths=self.depths)
@@ -475,22 +473,18 @@ class CVAE(Model):
         samples = tanhs.shape[0]
         d_obs = -(latent[..., self.latent_dim:])
         d_pre = -tf.reshape(self.predict_tanh(tanhs), (samples, self.n_data))
-        print('n_data', self.n_data)
-        print('d_obs',d_obs)
-        print('d_pre',d_pre)
         # print(self.data_std.flatten())
         if weighted:
             d_res = -tf.abs(d_obs - d_pre)*self.data_std.flatten()[None, :]
         else:
             d_res = -tf.abs(d_obs - d_pre)
         print('d_res', d_res.shape)
-        print('d_res1', d_res[..., :self.n_time].shape)
-        print('d_res2', d_res[..., self.n_time:].shape)
         # Why? I don't need to do this - for complex values
         print('d_res',d_res)
-        data = d_res[...,:self.n_time]
+        data = d_res[...,1:self.n_time]
+        print(data)
         plot_lines(data, save2file=save2file, filename=filename, step=step,
-                   ylims=ylims, times=self.times,x_label='Times (s)', y_label='Conductivity')
+                   ylims=ylims, times=self.times[1:],x_label='Times (s)', y_label='Conductivity')
 
 
 
@@ -650,8 +644,8 @@ def compute_loss(network, xy, rel_noise=0):
     #                             tf.transpose(d_pre),
     #                             sample_weight=network.data_weights))
 #     x_tanh2 = torch.tensor()
-    dim = x.shape[0]
-    x_tanh1 = tf.slice(x_tanh, [0,0,0], [dim,32,1])
+    # dim = x.shape[0]
+    # x_tanh1 = tf.slice(x_tanh, [0,0,0], [dim,32,1])
     # print('network n_model:',network.n_model-2)
     # print('x_tanh:',x_tanh1.shape)
     # print(x_tanh[0])
@@ -660,7 +654,7 @@ def compute_loss(network, xy, rel_noise=0):
     # print('x_tanh tensor:',tf.transpose(tf.reshape(x_tanh1, (-1, network.n_model-2))))
     # print('x tensor:',tf.transpose(tf.reshape(x, (-1, network.n_model-2))))
     logpx_z = tf.reduce_mean(
-        network.model_mean_error(tf.transpose(tf.reshape(x_tanh1, (-1, network.n_model))),
+        network.model_mean_error(tf.transpose(tf.reshape(x_tanh, (-1, network.n_model))),
                                  tf.transpose(tf.reshape(x, (-1, network.n_model))),
                                  sample_weight=network.model_weights))
     # print(logpx_z)
