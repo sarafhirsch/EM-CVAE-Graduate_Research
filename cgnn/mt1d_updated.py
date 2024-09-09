@@ -53,9 +53,6 @@ def EM(times, thicknesses):
         return simulation_conductive
 
 def forward_vec_freq(EM,con):
-        # if len(con) == 32:
-            # con = np.delete(con,[-2,-1])
-
         dpred_conductive = EM.dpred(con)
         return dpred_conductive
 
