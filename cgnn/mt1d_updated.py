@@ -11,8 +11,8 @@ from SimPEG.electromagnetics.utils.em1d_utils import ColeCole, LogUniform
 def EM(times, thicknesses):
         # super(EM, self).__init__()
         eps = 1e-6
-        ramp_on = np.r_[0.007-eps, 0.007]
-        ramp_off = np.r_[0.02,0.02+eps]
+        ramp_on = np.r_[-0.007, -0.007 + eps]
+        ramp_off = np.r_[0.006-eps, 0.006]
         waveform = tdem.sources.TrapezoidWaveform(
                     ramp_on=ramp_on, ramp_off=ramp_off)
 

@@ -20,6 +20,7 @@ from tensorflow.keras.losses import Reduction
 from tensorflow.keras.losses import MeanSquaredError, MeanAbsoluteError
 from tensorflow.keras.layers import (InputLayer, Dense, Flatten, Reshape,
                                      Conv1D, Conv1DTranspose)
+import keras.backend as K
 
 # from .mt1d import forward_1_freq, gradient_Z_1_freq, gradient_Z_con_1_freq
 # from cgnn import mt1d_updated
@@ -259,6 +260,7 @@ class CVAE(Model):
             data = d_input
         if self.log_data:
             data = -tf.exp(data)
+            # print('log')
         return data
 
     def data_input_noise(self, d_input, rel_noise):
@@ -312,18 +314,18 @@ class CVAE(Model):
         # nb = dd.shape[0]
         # xn = x#.numpy()
         xn = tf.reshape(x, (-1, nc)).numpy()
-        xn = xn[:,:30]
+        xn = xn[:,:32]
         # print('xn',xn.shape)
         # vJp = np.zeros((nb, nc))
         vJp = np.zeros(x.shape)
 
         # Zss = y.numpy()[:, :nf, :] + 1j*y.numpy()[:, nf:, :]
-        Zss = y[:, :30]
+        Zss = y[:, :32]
         # print('Zss',Zss.shape)
         for ib, (Zs, c) in enumerate(zip(Zss, xn)):
             # print('Zs',Zs.shape)
             # print('c',c.shape)
-            vJp[ib,:30,0] = gradient(self.simulation, c, Zs)
+            vJp[ib,:32,0] = gradient(self.simulation, c, Zs)
         # for ib, Zs in enumerate(Zss):
     #         # Z = forward_vec_freq(c, thicknesses, frequencies)
     #         dZdZ1 = gradient_Z(Zs, c, thicknesses, times)
@@ -617,7 +619,7 @@ def compute_loss(network, xy, rel_noise=0):
     '''
     x = xy[0]
     d_input = tf.cast(xy[1], np.float32)
-    print('d_input:', d_input)
+    tf.print('d_input:', d_input)
     d_true = network.input_to_data(d_input)
     if rel_noise > 0:
         d_input = network.data_input_noise(d_input, rel_noise)
@@ -632,13 +634,17 @@ def compute_loss(network, xy, rel_noise=0):
     zd = tf.concat((z, d_input), -1)
     print('zd:', zd)
     x_tanh = network.decode(zd, apply_tanh=True)
+    print('x_tanh', x_tanh)
     d_pre = tf.cast(network.predict_tanh(x_tanh), np.float32)
+    tf.print('d_true',d_true)
+    tf.print('d_pre', d_pre)
     # d_pre = tf.math.log(-tf.cast(network.predict_tanh(x_tanh), np.float32))
     # print(d_true.shape, d_pre.shape, network.data_weights.shape)
     dme = network.data_mean_error(tf.transpose(d_true),
                                   tf.transpose(tf.reshape(d_pre, (-1, network.n_data))),
                                   sample_weight=network.data_weights)
     data_misfit = tf.reduce_mean(dme)
+    tf.print('dme',dme)
     # data_misfit = tf.reduce_mean(
     #     network.data_mean_error(tf.transpose(d_true),
     #                             tf.transpose(d_pre),
@@ -671,6 +677,12 @@ def compute_loss(network, xy, rel_noise=0):
     #          tf.reduce_mean(logqz_x - logpz))
     terms = (data_misfit, logpx_z, -network.beta_vae*(logpz - logqz_x))
     loss = data_misfit + logpx_z - network.beta_vae*(logpz - logqz_x)
+    # print('loss',K.eval(loss))
+    # print('data_misfit',K.eval(data_misfit))
+    # print('logpx_z',K.eval(logpx_z))
+    # print('beta_vae', network.beta_vae)
+    # print('logqz_x',K.eval(logqz_x))
+    # print('logpz',K.eval(logpz))
     return (loss, terms)
 
 
