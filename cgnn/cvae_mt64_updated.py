@@ -120,29 +120,29 @@ class CVAE(Model):
         # initializer = tf.keras.initializers.GlorotUniform()
 
         self.inference_net = Sequential([
-            # 64 x 1, depth = 1
+            # 32 x 1, depth = 1
             InputLayer(input_shape=(32, channels)),
+            Conv1D(filters=8,
+                   kernel_size=3,
+                   strides=(2,),
+                   activation='relu',
+                   kernel_initializer=initializer
+                  ),
+            # 16, depth=8
             Conv1D(filters=16,
                    kernel_size=3,
                    strides=(2,),
                    activation='relu',
                    kernel_initializer=initializer
                   ),
-            # 32, depth=16
+            # 8, depth=16
             Conv1D(filters=32,
                    kernel_size=3,
                    strides=(2,),
                    activation='relu',
                    kernel_initializer=initializer
                   ),
-            # 16, depth=32
-            Conv1D(filters=64,
-                   kernel_size=3,
-                   strides=(2,),
-                   activation='relu',
-                   kernel_initializer=initializer
-                  ),
-            # 8, depth=64
+            # 4, depth=32
             Flatten(),
             # No activation
             Dense(latent_dim + latent_dim,
@@ -152,19 +152,10 @@ class CVAE(Model):
 
         self.generative_net = Sequential([
             InputLayer(input_shape=(latent_dim+n_data,)),
-            Dense(units=8*32, activation=tf.nn.relu,
+            Dense(units=4*32, activation=tf.nn.relu,
                   kernel_initializer=initializer
                  ),
-            Reshape(target_shape=(4, 64)),
-            Conv1DTranspose(
-                filters=64,
-                kernel_size=3,
-                strides=(2,),
-                padding="SAME",
-                activation='relu',
-                kernel_initializer=initializer
-            ),
-            # 16, depth=64
+            Reshape(target_shape=(4, 32)),
             Conv1DTranspose(
                 filters=32,
                 kernel_size=3,
@@ -173,7 +164,7 @@ class CVAE(Model):
                 activation='relu',
                 kernel_initializer=initializer
             ),
-            # 32, depth=32
+            # 8, depth=32
             Conv1DTranspose(
                 filters=16,
                 kernel_size=3,
@@ -182,7 +173,16 @@ class CVAE(Model):
                 activation='relu',
                 kernel_initializer=initializer
             ),
-            # 64, depth=16
+            # 16, depth=16
+            Conv1DTranspose(
+                filters=8,
+                kernel_size=3,
+                strides=(2,),
+                padding="SAME",
+                activation='relu',
+                kernel_initializer=initializer
+            ),
+            # 32, depth=8
             # No activation
             Conv1DTranspose(
                 filters=1,
@@ -216,6 +216,8 @@ class CVAE(Model):
         return tanhs
 
     def encode(self, x):
+        print(x)
+        print(self.inference_net.summary())
         mean, logvar = tf.split(self.inference_net(
             x), num_or_size_splits=2, axis=1)
         return mean, logvar
@@ -225,6 +227,8 @@ class CVAE(Model):
         return eps * tf.exp(logvar * .5) + mean
 
     def decode(self, z, apply_tanh=False):
+        # print('z',z)
+        # print(self.generative_net.summary())
         tanhs = self.generative_net(z)
         if apply_tanh:
             probs = tf.tanh(tanhs)
@@ -255,12 +259,15 @@ class CVAE(Model):
 
     def input_to_data(self, d_input):
         if self.norm_data:
+            print('norm')
             data = d_input/self.data_scale + self.data_shift
         else:
+            print('none')
             data = d_input
         if self.log_data:
-            data = -tf.exp(data)
-            # print('log')
+            # data = -tf.exp(data)
+            data = d_input
+            print('log')
         return data
 
     def data_input_noise(self, d_input, rel_noise):
@@ -358,25 +365,16 @@ class CVAE(Model):
     
     @tf.custom_gradient
     def predict_data(self, model):
-        '''
-        Accepts conductivity model
-        Outputs data, varying fastest in frequency and slowest in real/imag
-        Returns data and gradient as a tuple, as per
-        https://www.tensorflow.org/api_docs/python/tf/custom_gradient
-        https://www.tensorflow.org/guide/advanced_autodiff#custom_gradients
-        https://stackoverflow.com/questions/56657993/how-to-create-a-keras-layer-with-a-custom-gradient-in-tf2-0
-        https://stackoverflow.com/questions/58223640/custom-activation-with-custom-gradient-does-not-work
-        '''
         ys = tf.numpy_function(
             self.forward_np, [model, self.thicknesses, self.times],
             model.dtype)
 #         print(self.frequencies.shape)
 #         print(self.thicknesses.shape)
 #         print('model', model[-1])
-        print('ys', ys.shape)
+        # print('ys', ys.shape)
         # Why?
         ys_test = ys[..., 0]
-        print('ys_test', ys_test.shape)
+        # print('ys_test', ys_test.shape)
         def tdem_grad(ddata):
             '''
             Return J^T ddata
@@ -618,8 +616,9 @@ def compute_loss(network, xy, rel_noise=0):
     total loss function
     '''
     x = xy[0]
+    tf.print('x',xy[0])
     d_input = tf.cast(xy[1], np.float32)
-    tf.print('d_input:', d_input)
+    # tf.print('d_input:', d_input)
     d_true = network.input_to_data(d_input)
     if rel_noise > 0:
         d_input = network.data_input_noise(d_input, rel_noise)
@@ -630,21 +629,23 @@ def compute_loss(network, xy, rel_noise=0):
     # d_true += eps*network.data_std
     # d_true_log = tf.math.log(-d_true)
     mean, logvar = network.encode(x)
+    # tf.print('x', x)
     z = network.reparameterize(mean, logvar)
+    tf.print('z', z)
     zd = tf.concat((z, d_input), -1)
-    print('zd:', zd)
+    tf.print('zd:', zd)
     x_tanh = network.decode(zd, apply_tanh=True)
-    print('x_tanh', x_tanh)
+    tf.print('x_tanh', x_tanh)
     d_pre = tf.cast(network.predict_tanh(x_tanh), np.float32)
-    tf.print('d_true',d_true)
-    tf.print('d_pre', d_pre)
+    # tf.print('d_true',d_true)
+    # tf.print('d_pre', d_pre)
     # d_pre = tf.math.log(-tf.cast(network.predict_tanh(x_tanh), np.float32))
     # print(d_true.shape, d_pre.shape, network.data_weights.shape)
     dme = network.data_mean_error(tf.transpose(d_true),
                                   tf.transpose(tf.reshape(d_pre, (-1, network.n_data))),
                                   sample_weight=network.data_weights)
     data_misfit = tf.reduce_mean(dme)
-    tf.print('dme',dme)
+    # tf.print('dme',dme)
     # data_misfit = tf.reduce_mean(
     #     network.data_mean_error(tf.transpose(d_true),
     #                             tf.transpose(d_pre),
@@ -672,7 +673,7 @@ def compute_loss(network, xy, rel_noise=0):
     loss = data_misfit + logpx_z - network.beta_vae*(logpz - logqz_x)
     # print('loss',K.eval(loss))
     # print('data_misfit',K.eval(data_misfit))
-    # print('logpx_z',K.eval(logpx_z))
+    # tf.print('logpx_z',logpx_z)
     # print('beta_vae', network.beta_vae)
     # print('logqz_x',K.eval(logqz_x))
     # print('logpz',K.eval(logpz))
@@ -728,9 +729,6 @@ def compute_reconstruction_loss(network, xy, rel_noise=0):
 def compute_apply_gradients(network, xy, optimizer, use_data_misfit=True, rel_noise=0):
     with tf.GradientTape() as tape:
         if use_data_misfit:
-            print('loss')
-            print('network',network)
-            print('xy',xy)
             loss, terms = compute_loss(network, xy, rel_noise=rel_noise)
         else:
             print('reconstrauction')

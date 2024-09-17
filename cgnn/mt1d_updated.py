@@ -21,7 +21,7 @@ def EM(times, thicknesses):
         current_amplitude = 1.0  # maximum amplitude of source current
         source_radius = 10.0  # loop radius
 
-        receiver_location = np.array([0.0, 0.0, 120])
+        receiver_location = np.array([0.0, 0.0, 12])
         receiver_orientation = "z"  # "x", "y" or "z"
 
         receiver_list = []
