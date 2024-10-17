@@ -80,7 +80,7 @@ class CVAE(Model):
         self.data_scale = data_scale
 
         self.simulation = EM(times=self.times,thicknesses = self.thicknesses)
-        print(self.simulation)
+        # print(self.simulation)
 
         if model_loss_type == 'se':
             self.model_mean_error = MeanSquaredError(
@@ -216,8 +216,8 @@ class CVAE(Model):
         return tanhs
 
     def encode(self, x):
-        print(x)
-        print(self.inference_net.summary())
+        # print(x)
+        # print(self.inference_net.summary())
         mean, logvar = tf.split(self.inference_net(
             x), num_or_size_splits=2, axis=1)
         return mean, logvar
@@ -259,15 +259,15 @@ class CVAE(Model):
 
     def input_to_data(self, d_input):
         if self.norm_data:
-            print('norm')
+            # print('norm')
             data = d_input/self.data_scale + self.data_shift
         else:
-            print('none')
+            # print('none')
             data = d_input
         if self.log_data:
             # data = -tf.exp(data)
             data = d_input
-            print('log')
+            # print('log')
         return data
 
     def data_input_noise(self, d_input, rel_noise):
@@ -395,8 +395,13 @@ class CVAE(Model):
         '''
         Predict data, given an output
         '''
-        print('tanhs', tanhs.shape)
+        # print('tanhs', tanhs.shape)
         return self.predict_data(tf.exp(self.tanhs_to_model(tanhs)))
+    
+    def normalize(data):
+        min = np.min(data)
+        max = np.max(data)
+        return (data-min)/(max-min+1e-20)
 
     def plot_models(self, save2file=False, folder='.', samples=16,
                     latent=None, step=None):
@@ -409,7 +414,7 @@ class CVAE(Model):
             filename = folder+"/model_%05d.png" % step
         tanhs = self.decode(latent, apply_tanh=True)
         samples = tanhs.shape[0]
-        print(tanhs.shape)
+        # print(tanhs.shape)
         tanhs = np.reshape(tanhs, (samples, self.n_model))
         plot_logs(np.exp(self.tanhs_to_model(tanhs)), save2file=True,
                   filename=filename, step=16, depths=self.depths)
@@ -442,14 +447,14 @@ class CVAE(Model):
         tanhs = self.decode(latent, apply_tanh=True)
         samples = tanhs.shape[0]
         d_obs = (latent[..., self.latent_dim+16:])
-        print('d_obs',d_obs)
+        # print('d_obs',d_obs)
         d_pre = tf.reshape(self.predict_tanh(tanhs), (samples, self.n_data))
         d_pre = d_pre[...,16:]
-        print('d_pre',d_pre)
+        # print('d_pre',d_pre)
         data = np.stack((d_obs[..., :self.n_time],
                         d_pre[..., :self.n_time:]), axis=-1)
         # data = d_pre[...,:self.n_time]
-        print('data',data)
+        # print('data',data)
         # print('data min', data.min)
         plot_lines(data, save2file=True, filename=filename, step=16,
                    ylims=ylims, times=self.times[1:],
@@ -478,11 +483,11 @@ class CVAE(Model):
             d_res = -tf.abs(d_obs - d_pre)*self.data_std.flatten()[None, :]
         else:
             d_res = -tf.abs(d_obs - d_pre)
-        print('d_res', d_res.shape)
+        # print('d_res', d_res.shape)
         # Why? I don't need to do this - for complex values
-        print('d_res',d_res)
+        # print('d_res',d_res)
         data = d_res[...,1:self.n_time]
-        print(data)
+        # # print(data)
         plot_lines(data, save2file=save2file, filename=filename, step=step,
                    ylims=ylims, times=self.times[1:],x_label='Times (s)', y_label='Conductivity')
 
@@ -616,7 +621,7 @@ def compute_loss(network, xy, rel_noise=0):
     total loss function
     '''
     x = xy[0]
-    tf.print('x',xy[0])
+    # tf.print('x',xy[0])
     d_input = tf.cast(xy[1], np.float32)
     # tf.print('d_input:', d_input)
     d_true = network.input_to_data(d_input)
@@ -631,11 +636,11 @@ def compute_loss(network, xy, rel_noise=0):
     mean, logvar = network.encode(x)
     # tf.print('x', x)
     z = network.reparameterize(mean, logvar)
-    tf.print('z', z)
+    # tf.print('z', z)
     zd = tf.concat((z, d_input), -1)
-    tf.print('zd:', zd)
+    # tf.print('zd:', zd)
     x_tanh = network.decode(zd, apply_tanh=True)
-    tf.print('x_tanh', x_tanh)
+    # tf.print('x_tanh', x_tanh)
     d_pre = tf.cast(network.predict_tanh(x_tanh), np.float32)
     # tf.print('d_true',d_true)
     # tf.print('d_pre', d_pre)
@@ -699,19 +704,19 @@ def compute_reconstruction_loss(network, xy, rel_noise=0):
     z = network.reparameterize(mean, logvar)
     zd = tf.concat((z, d_input), -1)
     x_tanh = network.decode(zd, apply_tanh=True)
-    print(network.n_model)
-    print(x_tanh.shape)
-    print(x.shape)
+    # print(network.n_model)
+    # print(x_tanh.shape)
+    # print(x.shape)
 
     dim = x.shape[0]
     x_tanh1 = tf.slice(x_tanh, [0,0,0], [dim,30,1])
-    print('network n_model:',network.n_model-2)
-    print('x_tanh:',x_tanh1.shape)
-    print(x_tanh[0])
-    print(x_tanh1[0])
-    print('x:',x.shape)
-    print('x_tanh tensor:',tf.transpose(tf.reshape(x_tanh1, (-1, network.n_model-2))))
-    print('x tensor:',tf.transpose(tf.reshape(x, (-1, network.n_model-2))))
+    # print('network n_model:',network.n_model-2)
+    # print('x_tanh:',x_tanh1.shape)
+    # print(x_tanh[0])
+    # print(x_tanh1[0])
+    # print('x:',x.shape)
+    # print('x_tanh tensor:',tf.transpose(tf.reshape(x_tanh1, (-1, network.n_model-2))))
+    # print('x tensor:',tf.transpose(tf.reshape(x, (-1, network.n_model-2))))
     logpx_z = tf.reduce_mean(
         network.model_mean_error(tf.reshape(x_tanh1, (-1, network.n_model)),
                                  tf.reshape(x, (-1, network.n_model)),
