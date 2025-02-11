@@ -450,7 +450,7 @@ class CVAE(Model):
                  filename=filename, step=step, depths=self.depths)
 
     def plot_data(self, save2file=False, folder='.', samples=16,
-                  latent=None, step=None, ylims=(1e-22, 1e-10)):
+                  latent=None, step=None, ylims=(0, 1000)):
         if latent is None:
             latent = np.random.normal(
                 0.0, 1.0, size=[samples, self.latent_dim+self.n_data])
@@ -461,22 +461,22 @@ class CVAE(Model):
         # print('latent',latent)
         tanhs = self.decode(latent, apply_tanh=True)
         samples = tanhs.shape[0]
-        d_obs = (latent[..., self.latent_dim:])
+        d_obs = -tf.exp(latent[..., self.latent_dim:])
         # print('d_obs',d_obs)
-        d_pre = tf.reshape(self.predict_tanh(tanhs), (samples, self.n_data))
-        d_pre = d_pre[...,16:]
+        d_pre = tf.reshape(self.predict_tanh(tanhs), (samples, self.n_time))
+        # d_pre = d_pre[...,16:]
         # print('d_pre',d_pre)
-        data = np.stack((d_obs[..., :self.n_time],
-                        d_pre[..., :self.n_time:]), axis=-1)
+        data = np.stack((d_obs,
+                        d_pre), axis=-1)
         # data = d_pre[...,:self.n_time]
-        # print('data',data)
+        print('data',data)
         # print('data min', data.min)
-        plot_lines(data, save2file=True, filename=filename, step=16,
+        plot_lines(data, save2file=False, filename=filename, step=16,
                    ylims=ylims, times=self.times[1:],
                    legend_labels=['Obs','Pre'],x_label='Times (s)', y_label='dB/dt')
 
     def plot_residuals(self, save2file=False, folder='.', samples=16,
-                       latent=None, step=None, ylims=(1e-25, 1e-10),
+                       latent=None, step=None, ylims=(-10, 0),
                        weighted=True):
         '''
         Plot data residuals;
@@ -494,7 +494,7 @@ class CVAE(Model):
         d_obs = -(latent[..., self.latent_dim:])
         # print(len(self.predict_tanh(tanhs)))
         # print('samples',len(samples))
-        d_pre = -tf.reshape(self.predict_tanh(tanhs), (samples, self.n_data))
+        d_pre = -tf.reshape(self.predict_tanh(tanhs), (samples, self.n_time))
         # print(self.data_std.flatten())
         if weighted:
             d_res = -tf.abs(d_obs - d_pre[:,0:self.n_time])*self.data_std.flatten()[None, :]
@@ -504,7 +504,7 @@ class CVAE(Model):
         # Why? I don't need to do this - for complex values
         # print('d_res',d_res)
         data = d_res[...,1:self.n_time]
-        # # print(data)
+        print(data)
         plot_lines(data, save2file=save2file, filename=filename, step=step,
                    ylims=ylims, times=self.times[1:],x_label='Times (s)', y_label='Conductivity')
 
@@ -529,7 +529,7 @@ def plot_log(ax, log, depths=None):
 
 
 def plot_logs(logs, save2file=False, filename='./model.png', step=None,
-              xlims=(2e-2, 2e3), depths=None,
+              xlims=(1e-4, 1e2), depths=None,
               x_label='Conductivity, S/m',
               y_label='Depth, m'
              ):
@@ -586,7 +586,7 @@ def plot_complex(data, **kwargs):
 
 
 def plot_lines(data, save2file=False, filename='./data.png', step=None,
-               ylims=(0, 1000), times=None,
+               ylims=(0, 20), times=None,
                x_label='Conductivity, (S/m)',
                y_label='Depth',legend_labels=None):
     # matplotlib.rc('font', size=14)
@@ -664,15 +664,15 @@ def compute_loss(network, xy, rel_noise=0):
     print(network.predict_tanh(x_tanh))
     d_pre = tf.cast(network.predict_tanh(x_tanh), np.float32)
     # d_pre = x_tanh
-    print('d_true',tf.transpose(d_true))
+    tf.print('d_true',tf.transpose(d_true))
     # d_pre = tf.reshape(d_pre, tf.shape(d_true))
-    print('d_pre', tf.transpose(tf.reshape(d_pre, (10, network.n_time))))
+    tf.print('d_pre', tf.transpose(tf.reshape(d_pre, (-1, network.n_time))))
     # d_pre = tf.math.log(-tf.cast(network.predict_tanh(x_tanh), np.float32))
     # print(d_true.shape, d_pre.shape, network.data_weights.shape)
     d_true1 = tf.reshape(d_true,(1000,16))
     d_preT = d_pre[:1000,...]
-    dme = network.data_mean_error(tf.transpose(d_true1),
-                                  tf.transpose(tf.reshape(d_preT, (1000, network.n_time))),
+    dme = network.data_mean_error(tf.transpose(d_true),
+                                  tf.transpose(tf.reshape(d_pre, (-1, network.n_time))),
                                   sample_weight=network.data_weights)
     # tf.print(dme)
     data_misfit = tf.reduce_mean(dme)

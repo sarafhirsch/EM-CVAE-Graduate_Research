@@ -49,9 +49,9 @@ def EM(times, thicknesses):
 
 def forward_vec_freq(EM,con):
         dpred_conductive = EM.dpred(con)
-        dpred = dpred_conductive*1e15 #Double check unit conversion
+        dpred = dpred_conductive*1e13 #Double check unit conversion
         # print('dpred',len(dpred))
-        return np.abs(dpred)
+        return dpred
 
 
 def gradient(EM,con,v):
