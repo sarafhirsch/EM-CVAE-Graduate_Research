@@ -38,7 +38,6 @@ def EM(times, thicknesses):
                 receiver_list=receiver_list,
                 location=source_location,
                 waveform=waveform,
-                current=current_amplitude,
                 radius=source_radius,)]
 
     # Survey
