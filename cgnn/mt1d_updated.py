@@ -11,49 +11,47 @@ from SimPEG.electromagnetics.utils.em1d_utils import ColeCole, LogUniform
 def EM(times, thicknesses):
         # super(EM, self).__init__()
         eps = 1e-6
-        ramp_on = np.r_[-0.007, -0.007 + eps]
-        ramp_off = np.r_[0.006-eps, 0.006]
-        waveform = tdem.sources.TrapezoidWaveform(
-                    ramp_on=ramp_on, ramp_off=ramp_off)
+        # I used provided start and end times for first pulse to accurately create the correctly sized square-waveform
+        ramp_on = np.r_[0.007, 0.007 + eps]
+        ramp_off = np.r_[0.020-eps, 0.020]
+        times_currents = np.r_[ramp_on, ramp_off]
+        times_currents -= times_currents.max()
+        currents = np.array([0,1,1,0])
+        waveform = tdem.sources.PiecewiseLinearWaveform(times_currents, currents)
 
-        source_location = np.array([0.0, 0.0, 120])
-        source_orientation = "z"   # "x", "y" or "z"
-        current_amplitude = 1.0  # maximum amplitude of source current
-        source_radius = 10.0  # loop radius
+        receiver_location = np.array([[-108,0, 68]])  # Receiver location
+        receiver = tdem.receivers.PointMagneticFluxTimeDerivative(
+            locations=receiver_location, times=times, orientation="z",)
 
-        receiver_location = np.array([0.0, 0.0, 120])
-        receiver_orientation = "z"  # "x", "y" or "z"
-
-        receiver_list = []
-        receiver_list.append(
-            tdem.receivers.PointMagneticFluxDensity(
-                receiver_location, times, orientation=receiver_orientation))
-        receiver_list.append(
-            tdem.receivers.PointMagneticFluxTimeDerivative(
-                receiver_location, times, orientation=receiver_orientation))
+        receiver_b = tdem.receivers.PointMagneticFluxDensity(
+            locations=receiver_location, times=times, orientation="z",)
 
     # Sources
-        source_list = [
-            tdem.sources.CircularLoop(
-                receiver_list=receiver_list,
-                location=source_location,
-                waveform=waveform,
-                radius=source_radius,)]
+        source_location = np.array([0, 0, 120])  # Source location
+        source = tdem.sources.MagDipole(
+            receiver_list=[receiver, receiver_b],
+            waveform=waveform,
+            location=source_location,
+            # radius = 7,  # Transmitter loop radius
+            moment = 1, # usually the data are normalized by the Tx moment. 
+            srcType = 'inductive')
 
     # Survey
-        survey = tdem.Survey(source_list)
+        survey = tdem.Survey([source])
 
         model_mapping = maps.IdentityMap(nP=32)
-
+        # print(len(thicknesses))
     # Simulate response for static conductivity
         simulation_conductive = tdem.Simulation1DLayered(
             survey=survey, thicknesses=thicknesses, sigmaMap=model_mapping)
-        
+            
         return simulation_conductive
 
 def forward_vec_freq(EM,con):
         dpred_conductive = EM.dpred(con)
-        return dpred_conductive
+        dpred = dpred_conductive*1e15 #Double check unit conversion
+        # print('dpred',len(dpred))
+        return np.abs(dpred)
 
 
 def gradient(EM,con,v):

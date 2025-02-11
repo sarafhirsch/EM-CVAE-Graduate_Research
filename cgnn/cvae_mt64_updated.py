@@ -45,7 +45,7 @@ class ElapsedTimer(object):
 
 class CVAE(Model):
     def __init__(self, depths, min_model, max_model,
-                 times=np.arange(0, 15), norm_pad=0.1,
+                 times=np.arange(0, 16), norm_pad=0.1,
                  channels=1, data_std=1, model_std=1, latent_dim=50,
                  beta_vae=1, model_loss_type='mse', data_loss_type='mse',
                  log_data=True, norm_data=False, data_shift=0, data_scale=1,
@@ -64,7 +64,7 @@ class CVAE(Model):
         n_time = len(times)
         self.n_time = n_time
         # In orginal code, it is 2*n_freqs? Do I need to do this for times? Causes a lot of dimensionality issues
-        n_data = 2*n_time
+        n_data = n_time*2
         self.n_data = n_data
         self.data_std = data_std
         self.model_std = model_std
@@ -151,11 +151,11 @@ class CVAE(Model):
         ])
 
         self.generative_net = Sequential([
-            InputLayer(input_shape=(latent_dim+n_data,)),
-            Dense(units=4*32, activation=tf.nn.relu,
+            InputLayer(input_shape=(latent_dim+n_time,)),
+            Dense(units=4*16, activation=tf.nn.relu,
                   kernel_initializer=initializer
                  ),
-            Reshape(target_shape=(4, 32)),
+            Reshape(target_shape=(2, 32)),
             Conv1DTranspose(
                 filters=32,
                 kernel_size=3,
@@ -173,9 +173,17 @@ class CVAE(Model):
                 activation='relu',
                 kernel_initializer=initializer
             ),
-            # 16, depth=16
+            # # 16, depth=16
             Conv1DTranspose(
                 filters=8,
+                kernel_size=3,
+                strides=(2,),
+                padding="SAME",
+                activation='relu',
+                kernel_initializer=initializer
+            ),
+            Conv1DTranspose(
+                filters=4,
                 kernel_size=3,
                 strides=(2,),
                 padding="SAME",
@@ -230,6 +238,7 @@ class CVAE(Model):
         # print('z',z)
         # print(self.generative_net.summary())
         tanhs = self.generative_net(z)
+        print('tanhs',tanhs.shape)
         if apply_tanh:
             probs = tf.tanh(tanhs)
             return probs
@@ -294,19 +303,21 @@ class CVAE(Model):
         nb = x.shape[0]
         nc = x.shape[1]
         nt = len(times)
-        # print('nc', nc)
+        print('nb', nb)
+        # print('x', x)
         xn = tf.reshape(x, (-1, nc)).numpy()
         Zss = np.zeros((nb, nc))
         ic = 0
-        for ic, c in enumerate(xn):
-            # print('EM', EM.forward_vec_freq(c,thicknesses,times))
+        for ic, c in enumerate(xn): #Double check what is being passed into forward modelling
+            # print('EM', len(forward_vec_freq(self.simulation,c)))
+            # print('c', len(c))
             Zss[ic, :] = forward_vec_freq(self.simulation, c)
         # Rs = np.real(Zss)
         # Is = np.imag(Zss)
         # data_array = np.c_[Rs, Is]
-        data_array = Zss
+        data_array = Zss[:,:16]
         # print('Zss', Zss)
-        # print(data_array)
+        # print('data_array',tf.cast(data_array, tf.float32))
         return tf.cast(data_array, tf.float32)
     
     def gradient_np(self, x, y, dy, thicknesses, times):
@@ -371,10 +382,10 @@ class CVAE(Model):
 #         print(self.frequencies.shape)
 #         print(self.thicknesses.shape)
 #         print('model', model[-1])
-        # print('ys', ys.shape)
+        # print('ys', ys[0])
         # Why?
-        ys_test = ys[..., 0]
-        # print('ys_test', ys_test.shape)
+        ys_test = ys[...,0]
+        print('ys_test', ys_test.shape)
         def tdem_grad(ddata):
             '''
             Return J^T ddata
@@ -383,6 +394,9 @@ class CVAE(Model):
             return tf.numpy_function(
                 self.gradient_np, [model, ys, ddata, self.thicknesses, self.times],
                 model.dtype)
+        
+        # print('ys',ys.shape)
+        # tf.print('grad', tdem_grad)
         return ys, tdem_grad
 
     # def predict_log(self, logs):
@@ -412,9 +426,10 @@ class CVAE(Model):
             filename = folder+"/model.png"
         else:
             filename = folder+"/model_%05d.png" % step
+        print('latent',latent.shape)
         tanhs = self.decode(latent, apply_tanh=True)
         samples = tanhs.shape[0]
-        # print(tanhs.shape)
+        print('tanhs',tanhs.shape)
         tanhs = np.reshape(tanhs, (samples, self.n_model))
         plot_logs(np.exp(self.tanhs_to_model(tanhs)), save2file=True,
                   filename=filename, step=16, depths=self.depths)
@@ -446,7 +461,7 @@ class CVAE(Model):
         # print('latent',latent)
         tanhs = self.decode(latent, apply_tanh=True)
         samples = tanhs.shape[0]
-        d_obs = (latent[..., self.latent_dim+16:])
+        d_obs = (latent[..., self.latent_dim:])
         # print('d_obs',d_obs)
         d_pre = tf.reshape(self.predict_tanh(tanhs), (samples, self.n_data))
         d_pre = d_pre[...,16:]
@@ -477,12 +492,14 @@ class CVAE(Model):
         tanhs = self.decode(latent, apply_tanh=True)
         samples = tanhs.shape[0]
         d_obs = -(latent[..., self.latent_dim:])
+        # print(len(self.predict_tanh(tanhs)))
+        # print('samples',len(samples))
         d_pre = -tf.reshape(self.predict_tanh(tanhs), (samples, self.n_data))
         # print(self.data_std.flatten())
         if weighted:
-            d_res = -tf.abs(d_obs - d_pre)*self.data_std.flatten()[None, :]
+            d_res = -tf.abs(d_obs - d_pre[:,0:self.n_time])*self.data_std.flatten()[None, :]
         else:
-            d_res = -tf.abs(d_obs - d_pre)
+            d_res = -tf.abs(d_obs - d_pre[:,0:self.n_time])
         # print('d_res', d_res.shape)
         # Why? I don't need to do this - for complex values
         # print('d_res',d_res)
@@ -620,8 +637,9 @@ def compute_loss(network, xy, rel_noise=0):
     '''
     total loss function
     '''
+    # print(xy)
     x = xy[0]
-    # tf.print('x',xy[0])
+    # print('x1',xy[1])
     d_input = tf.cast(xy[1], np.float32)
     # tf.print('d_input:', d_input)
     d_true = network.input_to_data(d_input)
@@ -634,23 +652,32 @@ def compute_loss(network, xy, rel_noise=0):
     # d_true += eps*network.data_std
     # d_true_log = tf.math.log(-d_true)
     mean, logvar = network.encode(x)
-    # tf.print('x', x)
+    # print('x', x)
     z = network.reparameterize(mean, logvar)
+    # print('z', z)
+    # print('d_input',d_input)
     # tf.print('z', z)
     zd = tf.concat((z, d_input), -1)
     # tf.print('zd:', zd)
     x_tanh = network.decode(zd, apply_tanh=True)
-    # tf.print('x_tanh', x_tanh)
+    print('x_tanh', x_tanh)
+    print(network.predict_tanh(x_tanh))
     d_pre = tf.cast(network.predict_tanh(x_tanh), np.float32)
-    # tf.print('d_true',d_true)
-    # tf.print('d_pre', d_pre)
+    # d_pre = x_tanh
+    print('d_true',tf.transpose(d_true))
+    # d_pre = tf.reshape(d_pre, tf.shape(d_true))
+    print('d_pre', tf.transpose(tf.reshape(d_pre, (10, network.n_time))))
     # d_pre = tf.math.log(-tf.cast(network.predict_tanh(x_tanh), np.float32))
     # print(d_true.shape, d_pre.shape, network.data_weights.shape)
-    dme = network.data_mean_error(tf.transpose(d_true),
-                                  tf.transpose(tf.reshape(d_pre, (-1, network.n_data))),
+    d_true1 = tf.reshape(d_true,(1000,16))
+    d_preT = d_pre[:1000,...]
+    dme = network.data_mean_error(tf.transpose(d_true1),
+                                  tf.transpose(tf.reshape(d_preT, (1000, network.n_time))),
                                   sample_weight=network.data_weights)
+    # tf.print(dme)
     data_misfit = tf.reduce_mean(dme)
     # tf.print('dme',dme)
+    # tf.print('data_misfit', data_misfit)
     # data_misfit = tf.reduce_mean(
     #     network.data_mean_error(tf.transpose(d_true),
     #                             tf.transpose(d_pre),
@@ -665,6 +692,7 @@ def compute_loss(network, xy, rel_noise=0):
     # print(logpx_z)
     # logpx_z = tf.losses.mse(x_tanh, x)
     logpx_z = tf.cast(logpx_z, np.float32)
+    # tf.print('logpx_z',logpx_z)
     logpz = tf.reduce_mean(log_normal_pdf(z, 0., 0.))
     logqz_x = tf.reduce_mean(log_normal_pdf(z, mean, logvar))
     # print(data_misfit.dtype, logpx_z.dtype, logpz.dtype, logqz_x.dtype)
@@ -682,6 +710,7 @@ def compute_loss(network, xy, rel_noise=0):
     # print('beta_vae', network.beta_vae)
     # print('logqz_x',K.eval(logqz_x))
     # print('logpz',K.eval(logpz))
+    tf.print(loss)
     return (loss, terms)
 
 
@@ -700,16 +729,19 @@ def compute_reconstruction_loss(network, xy, rel_noise=0):
         d_input = network.data_input_noise(d_input, rel_noise)
     # d_true = tf.math.log(-tf.cast(network.predict_tanh(x), np.float32))
     # d_true = tf.cast(network.predict_tanh(x), np.float32)
+    print('x',x)
+    print('d_input',d_input)
     mean, logvar = network.encode(x)
     z = network.reparameterize(mean, logvar)
     zd = tf.concat((z, d_input), -1)
+    print(z)
     x_tanh = network.decode(zd, apply_tanh=True)
     # print(network.n_model)
     # print(x_tanh.shape)
     # print(x.shape)
 
     dim = x.shape[0]
-    x_tanh1 = tf.slice(x_tanh, [0,0,0], [dim,30,1])
+    # x_tanh1 = tf.slice(x_tanh, [0,0,0], [dim,30,1])
     # print('network n_model:',network.n_model-2)
     # print('x_tanh:',x_tanh1.shape)
     # print(x_tanh[0])
@@ -718,7 +750,7 @@ def compute_reconstruction_loss(network, xy, rel_noise=0):
     # print('x_tanh tensor:',tf.transpose(tf.reshape(x_tanh1, (-1, network.n_model-2))))
     # print('x tensor:',tf.transpose(tf.reshape(x, (-1, network.n_model-2))))
     logpx_z = tf.reduce_mean(
-        network.model_mean_error(tf.reshape(x_tanh1, (-1, network.n_model)),
+        network.model_mean_error(tf.reshape(x_tanh, (-1, network.n_model)),
                                  tf.reshape(x, (-1, network.n_model)),
         # sample_weight=(network.n_model)/(network.model_std**2))
         sample_weight=network.model_weights))
@@ -738,8 +770,10 @@ def compute_apply_gradients(network, xy, optimizer, use_data_misfit=True, rel_no
         else:
             print('reconstrauction')
             loss, terms = compute_reconstruction_loss(network, xy, rel_noise=rel_noise)
+    print('loss',loss)
+    print(network.trainable_variables)
     gradients = tape.gradient(loss, network.trainable_variables)
-    # optimizer.apply_gradients(zip(gradients, network.trainable_variables))
+    optimizer.apply_gradients(zip(gradients, network.trainable_variables))
     return (loss, terms)
 
 
