@@ -303,7 +303,7 @@ class CVAE(Model):
         nb = x.shape[0]
         nc = x.shape[1]
         nt = len(times)
-        print('nb', nb)
+        # print('nb', nb)
         # print('x', x)
         xn = tf.reshape(x, (-1, nc)).numpy()
         Zss = np.zeros((nb, nc))
@@ -316,9 +316,12 @@ class CVAE(Model):
         # Is = np.imag(Zss)
         # data_array = np.c_[Rs, Is]
         data_array = Zss[:,:16]
+        gradient_input = Zss
+        data_array = tf.cast(data_array, tf.float32)
+        gradient_input = tf.cast(gradient_input, tf.float32)
         # print('Zss', Zss)
         # print('data_array',tf.cast(data_array, tf.float32))
-        return tf.cast(data_array, tf.float32)
+        return data_array, gradient_input
     
     def gradient_np(self, x, y, dy, thicknesses, times):
         '''
@@ -376,23 +379,21 @@ class CVAE(Model):
     
     @tf.custom_gradient
     def predict_data(self, model):
-        ys = tf.numpy_function(
-            self.forward_np, [model, self.thicknesses, self.times],
-            model.dtype)
+        ys, ys_test = tf.numpy_function(self.forward_np, [model, self.thicknesses, self.times], [model.dtype, model.dtype])
 #         print(self.frequencies.shape)
 #         print(self.thicknesses.shape)
 #         print('model', model[-1])
-        # print('ys', ys[0])
+        # print('ys', ys.type)
         # Why?
-        ys_test = ys[...,0]
-        print('ys_test', ys_test.shape)
+        # ys_test = ys[...,:16]
+        # print('ys_test', ys[...,:16])
         def tdem_grad(ddata):
             '''
             Return J^T ddata
             '''
             # gradient(self.simulation,model,ddata)
             return tf.numpy_function(
-                self.gradient_np, [model, ys, ddata, self.thicknesses, self.times],
+                self.gradient_np, [model, ys_test, ddata, self.thicknesses, self.times],
                 model.dtype)
         
         # print('ys',ys.shape)
@@ -465,7 +466,7 @@ class CVAE(Model):
         # print('d_obs',d_obs)
         d_pre = tf.reshape(self.predict_tanh(tanhs), (samples, self.n_time))
         # d_pre = d_pre[...,16:]
-        # print('d_pre',d_pre)
+        print('d_pre',d_pre)
         data = np.stack((d_obs,
                         d_pre), axis=-1)
         # data = d_pre[...,:self.n_time]
@@ -660,17 +661,17 @@ def compute_loss(network, xy, rel_noise=0):
     zd = tf.concat((z, d_input), -1)
     # tf.print('zd:', zd)
     x_tanh = network.decode(zd, apply_tanh=True)
-    print('x_tanh', x_tanh)
-    print(network.predict_tanh(x_tanh))
+    # print('x_tanh', x_tanh)
+    # print(network.predict_tanh(x_tanh))
     d_pre = tf.cast(network.predict_tanh(x_tanh), np.float32)
     # d_pre = x_tanh
-    tf.print('d_true',tf.transpose(d_true))
+    # tf.print('d_true',tf.transpose(d_true))
     # d_pre = tf.reshape(d_pre, tf.shape(d_true))
-    tf.print('d_pre', tf.transpose(tf.reshape(d_pre, (-1, network.n_time))))
+    # tf.print('d_pre', tf.transpose(tf.reshape(d_pre, (-1, network.n_time))))
     # d_pre = tf.math.log(-tf.cast(network.predict_tanh(x_tanh), np.float32))
     # print(d_true.shape, d_pre.shape, network.data_weights.shape)
-    d_true1 = tf.reshape(d_true,(1000,16))
-    d_preT = d_pre[:1000,...]
+    # d_true1 = tf.reshape(d_true,(1000,16))
+    # d_preT = d_pre[:1000,...]
     dme = network.data_mean_error(tf.transpose(d_true),
                                   tf.transpose(tf.reshape(d_pre, (-1, network.n_time))),
                                   sample_weight=network.data_weights)
@@ -685,6 +686,8 @@ def compute_loss(network, xy, rel_noise=0):
 #     x_tanh2 = torch.tensor()
     # dim = x.shape[0]
     # x_tanh1 = tf.slice(x_tanh, [0,0,0], [dim,32,1])
+    # tf.print('x_tanh',tf.transpose(tf.reshape(-x_tanh, (-1, network.n_model))))
+    # tf.print('x', tf.transpose(tf.reshape(x, (-1, network.n_model))))
     logpx_z = tf.reduce_mean(
         network.model_mean_error(tf.transpose(tf.reshape(x_tanh, (-1, network.n_model))),
                                  tf.transpose(tf.reshape(x, (-1, network.n_model))),
@@ -710,7 +713,7 @@ def compute_loss(network, xy, rel_noise=0):
     # print('beta_vae', network.beta_vae)
     # print('logqz_x',K.eval(logqz_x))
     # print('logpz',K.eval(logpz))
-    tf.print(loss)
+    # tf.print(loss)
     return (loss, terms)
 
 
@@ -754,10 +757,10 @@ def compute_reconstruction_loss(network, xy, rel_noise=0):
                                  tf.reshape(x, (-1, network.n_model)),
         # sample_weight=(network.n_model)/(network.model_std**2))
         sample_weight=network.model_weights))
-    logpx_z = tf.cast(logpx_z, np.float32)
+    logpx_z = tf.cast(logpx_z, np.float32) # Reconstruction
     logpz = tf.reduce_mean(log_normal_pdf(z, 0., 0.))
     logqz_x = tf.reduce_mean(log_normal_pdf(z, mean, logvar))
-    loss =  logpx_z - network.beta_vae*(logpz - logqz_x)
+    loss =  logpx_z - network.beta_vae*(logpz - logqz_x) #Reconstruction - KL divergence
     terms = (logpx_z, network.beta_vae*(logqz_x - logpz))
     return (loss, terms)
 
