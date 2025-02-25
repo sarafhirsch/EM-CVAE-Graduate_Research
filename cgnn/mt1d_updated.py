@@ -49,7 +49,7 @@ def EM(times, thicknesses):
 
 def forward_vec_freq(EM,con):
         dpred_conductive = EM.dpred(con)
-        dpred = dpred_conductive*1e11 #Double check unit conversion
+        dpred = dpred_conductive #Double check unit conversion
         # print('dpred',len(dpred))
         return dpred
 

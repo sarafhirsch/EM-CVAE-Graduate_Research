@@ -46,8 +46,8 @@ class ElapsedTimer(object):
 class CVAE(Model):
     def __init__(self, depths, min_model, max_model,
                  times=np.arange(0, 16), norm_pad=0.1,
-                 channels=1, data_std=1, model_std=1, latent_dim=50,
-                 beta_vae=1, model_loss_type='mse', data_loss_type='mse',
+                 channels=1, data_std=1, model_std=1, latent_dim=20,
+                 beta_vae=0.1, model_loss_type='mse', data_loss_type='mse',
                  log_data=True, norm_data=False, data_shift=0, data_scale=1,
                  initializer=tf.keras.initializers.GlorotUniform()
                 ):
@@ -462,8 +462,8 @@ class CVAE(Model):
         # print('latent',latent)
         tanhs = self.decode(latent, apply_tanh=True)
         samples = tanhs.shape[0]
-        d_obs = -tf.exp(latent[..., self.latent_dim:])
-        # print('d_obs',d_obs)
+        d_obs = latent[..., self.latent_dim:]
+        print('d_obs',d_obs)
         d_pre = tf.reshape(self.predict_tanh(tanhs), (samples, self.n_time))
         # d_pre = d_pre[...,16:]
         print('d_pre',d_pre)
@@ -473,7 +473,7 @@ class CVAE(Model):
         print('data',data)
         # print('data min', data.min)
         plot_lines(data, save2file=False, filename=filename, step=16,
-                   ylims=ylims, times=self.times[1:],
+                   ylims=ylims, times=self.times[:15],
                    legend_labels=['Obs','Pre'],x_label='Times (s)', y_label='dB/dt')
 
     def plot_residuals(self, save2file=False, folder='.', samples=16,
@@ -603,7 +603,7 @@ def plot_lines(data, save2file=False, filename='./data.png', step=None,
             ax.semilogy(data_i)
         else:
             ax.loglog(times, data_i[:15])
-        plt.ylim(*ylims)
+        # plt.ylim(*ylims)
         if i%subplot_cols > 0:
             ax.axes.yaxis.set_ticks([])
         if i < (subplot_rows - 1)*subplot_cols:
@@ -638,7 +638,7 @@ def compute_loss(network, xy, rel_noise=0):
     '''
     total loss function
     '''
-    # print(xy)
+    print('xy', xy)
     x = xy[0]
     # print('x1',xy[1])
     d_input = tf.cast(xy[1], np.float32)
@@ -677,43 +677,15 @@ def compute_loss(network, xy, rel_noise=0):
                                   sample_weight=network.data_weights)
     # tf.print(dme)
     data_misfit = tf.reduce_mean(dme)
-    # tf.print('dme',dme)
-    # tf.print('data_misfit', data_misfit)
-    # data_misfit = tf.reduce_mean(
-    #     network.data_mean_error(tf.transpose(d_true),
-    #                             tf.transpose(d_pre),
-    #                             sample_weight=network.data_weights))
-#     x_tanh2 = torch.tensor()
-    # dim = x.shape[0]
-    # x_tanh1 = tf.slice(x_tanh, [0,0,0], [dim,32,1])
-    # tf.print('x_tanh',tf.transpose(tf.reshape(-x_tanh, (-1, network.n_model))))
-    # tf.print('x', tf.transpose(tf.reshape(x, (-1, network.n_model))))
     logpx_z = tf.reduce_mean(
         network.model_mean_error(tf.transpose(tf.reshape(x_tanh, (-1, network.n_model))),
                                  tf.transpose(tf.reshape(x, (-1, network.n_model))),
                                  sample_weight=network.model_weights))
-    # print(logpx_z)
-    # logpx_z = tf.losses.mse(x_tanh, x)
     logpx_z = tf.cast(logpx_z, np.float32)
-    # tf.print('logpx_z',logpx_z)
     logpz = tf.reduce_mean(log_normal_pdf(z, 0., 0.))
     logqz_x = tf.reduce_mean(log_normal_pdf(z, mean, logvar))
-    # print(data_misfit.dtype, logpx_z.dtype, logpz.dtype, logqz_x.dtype)
-    # print(data_misfit.shape, logpx_z.shape, logpz.shape, logqz_x.shape)
-    # loss = -tf.reduce_mean(-data_misfit - logpx_z +
-    #                        network.beta_vae*(logpz - logqz_x))
-    # terms = (tf.reduce_mean(data_misfit),
-    #          tf.reduce_mean(logpx_z),
-    #          tf.reduce_mean(logqz_x - logpz))
     terms = (data_misfit, logpx_z, -network.beta_vae*(logpz - logqz_x))
     loss = data_misfit + logpx_z - network.beta_vae*(logpz - logqz_x)
-    # print('loss',K.eval(loss))
-    # print('data_misfit',K.eval(data_misfit))
-    # tf.print('logpx_z',logpx_z)
-    # print('beta_vae', network.beta_vae)
-    # print('logqz_x',K.eval(logqz_x))
-    # print('logpz',K.eval(logpz))
-    # tf.print(loss)
     return (loss, terms)
 
 
@@ -773,8 +745,8 @@ def compute_apply_gradients(network, xy, optimizer, use_data_misfit=True, rel_no
         else:
             print('reconstrauction')
             loss, terms = compute_reconstruction_loss(network, xy, rel_noise=rel_noise)
-    print('loss',loss)
-    print(network.trainable_variables)
+    # print('loss',loss)
+    # print(network.trainable_variables)
     gradients = tape.gradient(loss, network.trainable_variables)
     optimizer.apply_gradients(zip(gradients, network.trainable_variables))
     return (loss, terms)
