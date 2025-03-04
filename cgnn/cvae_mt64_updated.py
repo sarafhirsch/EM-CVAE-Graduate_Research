@@ -19,7 +19,7 @@ from tensorflow.keras import Model, Sequential
 from tensorflow.keras.losses import Reduction
 from tensorflow.keras.losses import MeanSquaredError, MeanAbsoluteError
 from tensorflow.keras.layers import (InputLayer, Dense, Flatten, Reshape,
-                                     Conv1D, Conv1DTranspose)
+                                     Conv1D, Conv1DTranspose, BatchNormalization)
 import keras.backend as K
 
 # from .mt1d import forward_1_freq, gradient_Z_1_freq, gradient_Z_con_1_freq
@@ -152,10 +152,11 @@ class CVAE(Model):
 
         self.generative_net = Sequential([
             InputLayer(input_shape=(latent_dim+n_time,)),
-            Dense(units=4*16, activation=tf.nn.relu,
-                  kernel_initializer=initializer
-                 ),
+            Dense(units=4*16,kernel_initializer=initializer,
+                activation=tf.nn.relu
+                ),
             Reshape(target_shape=(2, 32)),
+            BatchNormalization(),
             Conv1DTranspose(
                 filters=32,
                 kernel_size=3,
@@ -164,6 +165,7 @@ class CVAE(Model):
                 activation='relu',
                 kernel_initializer=initializer
             ),
+            BatchNormalization(),
             # 8, depth=32
             Conv1DTranspose(
                 filters=16,
@@ -173,6 +175,7 @@ class CVAE(Model):
                 activation='relu',
                 kernel_initializer=initializer
             ),
+            BatchNormalization(),
             # # 16, depth=16
             Conv1DTranspose(
                 filters=8,
@@ -182,6 +185,7 @@ class CVAE(Model):
                 activation='relu',
                 kernel_initializer=initializer
             ),
+            BatchNormalization(),
             Conv1DTranspose(
                 filters=4,
                 kernel_size=3,
@@ -190,6 +194,7 @@ class CVAE(Model):
                 activation='relu',
                 kernel_initializer=initializer
             ),
+            BatchNormalization(),
             # 32, depth=8
             # No activation
             Conv1DTranspose(
@@ -238,7 +243,7 @@ class CVAE(Model):
         # print('z',z)
         # print(self.generative_net.summary())
         tanhs = self.generative_net(z)
-        print('tanhs',tanhs.shape)
+        # print('tanhs',tanhs.shape)
         if apply_tanh:
             probs = tf.tanh(tanhs)
             return probs
