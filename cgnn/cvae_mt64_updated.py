@@ -664,22 +664,11 @@ def compute_loss(network, xy, rel_noise=0):
     # print('d_input',d_input)
     # tf.print('z', z)
     zd = tf.concat((z, d_input), -1)
-    # tf.print('zd:', zd)
     x_tanh = network.decode(zd, apply_tanh=True)
-    # print('x_tanh', x_tanh)
-    # print(network.predict_tanh(x_tanh))
     d_pre = tf.cast(network.predict_tanh(x_tanh), np.float32)
-    # d_pre = x_tanh
-    # tf.print('d_true',tf.transpose(d_true))
-    # d_pre = tf.reshape(d_pre, tf.shape(d_true))
-    # tf.print('d_pre', tf.transpose(tf.reshape(d_pre, (-1, network.n_time))))
-    # d_pre = tf.math.log(-tf.cast(network.predict_tanh(x_tanh), np.float32))
-    # print(d_true.shape, d_pre.shape, network.data_weights.shape)
-    # d_true1 = tf.reshape(d_true,(1000,16))
-    # d_preT = d_pre[:1000,...]
     dme = network.data_mean_error(tf.transpose(d_true),
                                   tf.transpose(tf.reshape(d_pre, (-1, network.n_time))),
-                                  sample_weight=network.data_weights)
+                                  sample_weight=network.data_weights) #Down weight padded values (end of model)
     # tf.print(dme)
     data_misfit = tf.reduce_mean(dme)
     logpx_z = tf.reduce_mean(
