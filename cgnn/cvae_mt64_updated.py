@@ -467,9 +467,10 @@ class CVAE(Model):
         # print('latent',latent)
         tanhs = self.decode(latent, apply_tanh=True)
         samples = tanhs.shape[0]
-        d_obs = latent[..., self.latent_dim:]
+        d_obs = -latent[..., self.latent_dim:]
         print('d_obs',d_obs)
         d_pre = tf.reshape(self.predict_tanh(tanhs), (samples, self.n_time))
+        d_pre = d_pre*1e12
         # d_pre = d_pre[...,16:]
         print('d_pre',d_pre)
         data = np.stack((d_obs,
@@ -498,9 +499,12 @@ class CVAE(Model):
         tanhs = self.decode(latent, apply_tanh=True)
         samples = tanhs.shape[0]
         d_obs = -(latent[..., self.latent_dim:])
+        print('d_obs',d_obs)
         # print(len(self.predict_tanh(tanhs)))
         # print('samples',len(samples))
         d_pre = -tf.reshape(self.predict_tanh(tanhs), (samples, self.n_time))
+        d_pre = d_pre*1e12
+        print('d_pre',d_pre)
         # print(self.data_std.flatten())
         if weighted:
             d_res = -tf.abs(d_obs - d_pre[:,0:self.n_time])*self.data_std.flatten()[None, :]
@@ -668,7 +672,7 @@ def compute_loss(network, xy, rel_noise=0):
     d_pre = tf.cast(network.predict_tanh(x_tanh), np.float32)
     dme = network.data_mean_error(tf.transpose(d_true),
                                   tf.transpose(tf.reshape(d_pre, (-1, network.n_time))),
-                                  sample_weight=network.data_weights) #Down weight padded values (end of model)
+                                  sample_weight=network.data_weights) # Down weight padded values (end of model)
     # tf.print(dme)
     data_misfit = tf.reduce_mean(dme)
     logpx_z = tf.reduce_mean(
