@@ -82,6 +82,8 @@ class CVAE(Model):
         self.simulation = EM(times=self.times,thicknesses = self.thicknesses)
         # print(self.simulation)
 
+        # print(data_std)
+
         if model_loss_type == 'se':
             self.model_mean_error = MeanSquaredError(
                 reduction=Reduction.NONE)
@@ -166,7 +168,7 @@ class CVAE(Model):
                 kernel_initializer=initializer
             ),
             BatchNormalization(),
-            # 8, depth=32
+            # 4, depth=32
             Conv1DTranspose(
                 filters=16,
                 kernel_size=3,
@@ -176,7 +178,7 @@ class CVAE(Model):
                 kernel_initializer=initializer
             ),
             BatchNormalization(),
-            # # 16, depth=16
+            # # 8, depth=16
             Conv1DTranspose(
                 filters=8,
                 kernel_size=3,
@@ -186,6 +188,7 @@ class CVAE(Model):
                 kernel_initializer=initializer
             ),
             BatchNormalization(),
+            # 16, depth=8
             Conv1DTranspose(
                 filters=4,
                 kernel_size=3,
@@ -195,7 +198,7 @@ class CVAE(Model):
                 kernel_initializer=initializer
             ),
             BatchNormalization(),
-            # 32, depth=8
+            # 32, depth=4
             # No activation
             Conv1DTranspose(
                 filters=1,
@@ -470,7 +473,7 @@ class CVAE(Model):
         d_obs = -latent[..., self.latent_dim:]
         print('d_obs',d_obs)
         d_pre = tf.reshape(self.predict_tanh(tanhs), (samples, self.n_time))
-        d_pre = d_pre*1e12
+        d_pre = d_pre
         # d_pre = d_pre[...,16:]
         print('d_pre',d_pre)
         data = np.stack((d_obs,
@@ -503,7 +506,7 @@ class CVAE(Model):
         # print(len(self.predict_tanh(tanhs)))
         # print('samples',len(samples))
         d_pre = -tf.reshape(self.predict_tanh(tanhs), (samples, self.n_time))
-        d_pre = d_pre*1e12
+        d_pre = d_pre
         print('d_pre',d_pre)
         # print(self.data_std.flatten())
         if weighted:
@@ -670,6 +673,8 @@ def compute_loss(network, xy, rel_noise=0):
     zd = tf.concat((z, d_input), -1)
     x_tanh = network.decode(zd, apply_tanh=True)
     d_pre = tf.cast(network.predict_tanh(x_tanh), np.float32)
+    # tf.print('d_true',d_true)
+    # tf.print('d_pre', d_pre*1e11)
     dme = network.data_mean_error(tf.transpose(d_true),
                                   tf.transpose(tf.reshape(d_pre, (-1, network.n_time))),
                                   sample_weight=network.data_weights) # Down weight padded values (end of model)
