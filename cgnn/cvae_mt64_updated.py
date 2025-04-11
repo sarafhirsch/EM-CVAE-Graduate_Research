@@ -470,7 +470,7 @@ class CVAE(Model):
         # print('latent',latent)
         tanhs = self.decode(latent, apply_tanh=True)
         samples = tanhs.shape[0]
-        d_obs = -latent[..., self.latent_dim:]
+        d_obs = latent[..., self.latent_dim:]
         print('d_obs',d_obs)
         d_pre = tf.reshape(self.predict_tanh(tanhs), (samples, self.n_time))
         d_pre = d_pre
@@ -501,7 +501,7 @@ class CVAE(Model):
             filename = folder+"/residual_%05d.png" % step
         tanhs = self.decode(latent, apply_tanh=True)
         samples = tanhs.shape[0]
-        d_obs = -(latent[..., self.latent_dim:])
+        d_obs = latent[..., self.latent_dim:]
         print('d_obs',d_obs)
         # print(len(self.predict_tanh(tanhs)))
         # print('samples',len(samples))
