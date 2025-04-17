@@ -387,6 +387,7 @@ class CVAE(Model):
     
     @tf.custom_gradient
     def predict_data(self, model):
+        # print('model', len(model))
         ys, ys_test = tf.numpy_function(self.forward_np, [model, self.thicknesses, self.times], [model.dtype, model.dtype])
 #         print(self.frequencies.shape)
 #         print(self.thicknesses.shape)
@@ -471,11 +472,29 @@ class CVAE(Model):
         tanhs = self.decode(latent, apply_tanh=True)
         samples = tanhs.shape[0]
         d_obs = latent[..., self.latent_dim:]
-        print('d_obs',d_obs)
+        # print(d_obs)
+#         d_obs_T = d_obs*1e-15
+#         print(d_obs_T)
+#         print(self.times)
+#         times = torch.from_numpy(self.times).float()
+#         dt = times[1:] - times[:-1]  # shape (15,)
+
+# # Compute finite differences of observed data
+#         dB = d_obs[1:, :] - d_obs[:-1, :]  # shape (15, 16)
+
+# # Divide element-wise (broadcasting dt across columns)
+#         dB_dt = dB / dt[:, None]  # shape (15, 16)
+
+# Optionally pad to keep same shape (e.g., by repeating first value or adding NaNs)
+        # dB_dt = torch.nn.functional.pad(dB_dt, (0, 0, 1, 0), mode='replicate')  # shape (16, 16)
+        # d_obs_dBdt = np.gradient(d_obs_T.np(), self.times, axis=0)
+        # d_obs_dBdt = torch.from_numpy(d_obs_dBdt)
+        # print('d_obs',d_obs)
+        print('tanhs', len(tanhs))
         d_pre = tf.reshape(self.predict_tanh(tanhs), (samples, self.n_time))
-        d_pre = d_pre
+        # d_pre = d_pre
         # d_pre = d_pre[...,16:]
-        print('d_pre',d_pre)
+        # print('d_pre',d_pre)
         data = np.stack((d_obs,
                         d_pre), axis=-1)
         # data = d_pre[...,:self.n_time]
@@ -502,24 +521,24 @@ class CVAE(Model):
         tanhs = self.decode(latent, apply_tanh=True)
         samples = tanhs.shape[0]
         d_obs = latent[..., self.latent_dim:]
-        print('d_obs',d_obs)
+        # print('d_obs',d_obs)
         # print(len(self.predict_tanh(tanhs)))
         # print('samples',len(samples))
-        d_pre = -tf.reshape(self.predict_tanh(tanhs), (samples, self.n_time))
+        d_pre = tf.reshape(self.predict_tanh(tanhs), (samples, self.n_time))
         d_pre = d_pre
-        print('d_pre',d_pre)
+        # print('d_pre',d_pre)
         # print(self.data_std.flatten())
         if weighted:
             d_res = -tf.abs(d_obs - d_pre[:,0:self.n_time])*self.data_std.flatten()[None, :]
         else:
-            d_res = -tf.abs(d_obs - d_pre[:,0:self.n_time])
+            d_res = -tf.abs(d_obs - d_pre)
         # print('d_res', d_res.shape)
         # Why? I don't need to do this - for complex values
         # print('d_res',d_res)
-        data = d_res[...,1:self.n_time]
-        print(data)
+        data = d_res[...,:self.n_time]
+        print('data',data)
         plot_lines(data, save2file=save2file, filename=filename, step=step,
-                   ylims=ylims, times=self.times[1:],x_label='Times (s)', y_label='Conductivity')
+                   ylims=ylims, times=self.times[:15],x_label='Times (s)', y_label='Conductivity')
 
 
 
@@ -650,10 +669,11 @@ def compute_loss(network, xy, rel_noise=0):
     '''
     total loss function
     '''
-    print('xy', xy)
+    # print('xy', xy)
     x = xy[0]
     # print('x1',xy[1])
     d_input = tf.cast(xy[1], np.float32)
+    # d_input = np.gradient((d_input*1e-15), network.times)
     # tf.print('d_input:', d_input)
     d_true = network.input_to_data(d_input)
     if rel_noise > 0:
@@ -707,12 +727,12 @@ def compute_reconstruction_loss(network, xy, rel_noise=0):
         d_input = network.data_input_noise(d_input, rel_noise)
     # d_true = tf.math.log(-tf.cast(network.predict_tanh(x), np.float32))
     # d_true = tf.cast(network.predict_tanh(x), np.float32)
-    print('x',x)
-    print('d_input',d_input)
+    # print('x',x)
+    # print('d_input',d_input)
     mean, logvar = network.encode(x)
     z = network.reparameterize(mean, logvar)
     zd = tf.concat((z, d_input), -1)
-    print(z)
+    # print(z)
     x_tanh = network.decode(zd, apply_tanh=True)
     # print(network.n_model)
     # print(x_tanh.shape)

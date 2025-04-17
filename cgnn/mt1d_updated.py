@@ -51,7 +51,7 @@ def forward_vec_freq(EM,con):
         dpred_conductive = EM.dpred(con)
         dpred = dpred_conductive #Double check unit conversion
         # print('dpred',len(dpred))
-        return dpred*1e11
+        return dpred
 
 
 def gradient(EM,con,v):
