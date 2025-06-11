@@ -55,7 +55,7 @@ class CVAE(Model):
 
         self.depths = depths
         self.thicknesses = depths - np.r_[0, depths[:-1]]
-        print('thicknesses',self.thicknesses.shape)
+        # print('thicknesses',self.thicknesses.shape)
         n_model = len(depths)+1
         self.n_model = n_model
         self.channels = channels
@@ -436,12 +436,12 @@ class CVAE(Model):
             filename = folder+"/model.png"
         else:
             filename = folder+"/model_%05d.png" % step
-        print('latent',latent.shape)
+        # print('latent',latent.shape)
         tanhs = self.decode(latent, apply_tanh=True)
         samples = tanhs.shape[0]
-        print('tanhs',tanhs.shape)
+        # print('tanhs',tanhs.shape)
         tanhs = np.reshape(tanhs, (samples, self.n_model))
-        plot_logs(np.exp(self.tanhs_to_model(tanhs)), save2file=True,
+        plot_logs(np.exp(self.tanhs_to_model(tanhs)), save2file=False,
                   filename=filename, step=16, depths=self.depths)
 
     def overlay_models(self, save2file=False, folder='.', samples=16,
@@ -490,7 +490,7 @@ class CVAE(Model):
         # d_obs_dBdt = np.gradient(d_obs_T.np(), self.times, axis=0)
         # d_obs_dBdt = torch.from_numpy(d_obs_dBdt)
         # print('d_obs',d_obs)
-        print('tanhs', len(tanhs))
+        # print('tanhs', len(tanhs))
         d_pre = tf.reshape(self.predict_tanh(tanhs), (samples, self.n_time))
         # d_pre = d_pre
         # d_pre = d_pre[...,16:]
@@ -498,7 +498,7 @@ class CVAE(Model):
         data = np.stack((d_obs,
                         d_pre), axis=-1)
         # data = d_pre[...,:self.n_time]
-        print('data',data)
+        # print('data',data)
         # print('data min', data.min)
         plot_lines(data, save2file=False, filename=filename, step=16,
                    ylims=ylims, times=self.times[:15],
@@ -521,17 +521,20 @@ class CVAE(Model):
         tanhs = self.decode(latent, apply_tanh=True)
         samples = tanhs.shape[0]
         d_obs = latent[..., self.latent_dim:]
-        # print('d_obs',d_obs)
-        # print(len(self.predict_tanh(tanhs)))
-        # print('samples',len(samples))
         d_pre = tf.reshape(self.predict_tanh(tanhs), (samples, self.n_time))
         d_pre = d_pre
-        # print('d_pre',d_pre)
-        # print(self.data_std.flatten())
+        print("d_obs:", d_obs.shape)
+        print("d_pre:", d_pre.shape)
+        print("data_std:", self.data_std.shape)
+        print("n_time:", self.n_time)
+        d_std = tf.reshape(self.data_std[:,:self.n_time], (1, self.n_time)) 
+        d_std = tf.cast(d_std, tf.float32)
+        print("d_std:", d_std.shape)
         if weighted:
-            d_res = -tf.abs(d_obs - d_pre[:,0:self.n_time])*self.data_std.flatten()[None, :]
+            d_res = -tf.abs(d_obs - d_pre[:, :16]) * d_std
+            # d_res = -tf.abs(d_obs - d_pre[:,0:self.n_time])*self.data_std.flatten()[None, :]
         else:
-            d_res = -tf.abs(d_obs - d_pre)
+            d_res = -tf.abs(d_obs - d_pre[:, :16])
         # print('d_res', d_res.shape)
         # Why? I don't need to do this - for complex values
         # print('d_res',d_res)
