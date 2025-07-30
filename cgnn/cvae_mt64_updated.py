@@ -339,7 +339,7 @@ class CVAE(Model):
         nc = x.shape[1]
         nt = len(times)
         # print(type(x), type(y), type(dy))
-        dd = np.reshape(dy, (-1, 2*nt))#.numpy()
+        dd = np.reshape(dy, (-1, nt))#.numpy()
         # nb = dd.shape[0]
         # xn = x#.numpy()
         xn = tf.reshape(x, (-1, nc)).numpy()
@@ -392,7 +392,6 @@ class CVAE(Model):
 #         print(self.frequencies.shape)
 #         print(self.thicknesses.shape)
 #         print('model', model[-1])
-        # print('ys', ys.type)
         # Why?
         # ys_test = ys[...,:16]
         # print('ys_test', ys[...,:16])
@@ -400,6 +399,11 @@ class CVAE(Model):
             '''
             Return J^T ddata
             '''
+            # print('ys_test', ys_test)
+            # print('model', model)
+            # print('ddata', ddata)
+            # print(self.thicknesses)
+            # print(self.times)
             # gradient(self.simulation,model,ddata)
             return tf.numpy_function(
                 self.gradient_np, [model, ys_test, ddata, self.thicknesses, self.times],
@@ -769,7 +773,7 @@ def compute_apply_gradients(network, xy, optimizer, use_data_misfit=True, rel_no
         if use_data_misfit:
             loss, terms = compute_loss(network, xy, rel_noise=rel_noise)
         else:
-            print('reconstrauction')
+            print('reconstruction')
             loss, terms = compute_reconstruction_loss(network, xy, rel_noise=rel_noise)
     # print('loss',loss)
     # print(network.trainable_variables)
