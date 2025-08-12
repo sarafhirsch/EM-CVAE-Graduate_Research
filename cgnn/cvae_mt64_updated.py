@@ -15,10 +15,10 @@ import matplotlib.pyplot as plt
 import torch
 
 import tensorflow as tf
-from tensorflow.keras import Model, Sequential
-from tensorflow.keras.losses import Reduction
-from tensorflow.keras.losses import MeanSquaredError, MeanAbsoluteError
-from tensorflow.keras.layers import (InputLayer, Dense, Flatten, Reshape,
+from tensorflow.keras import Model, Sequential # type: ignore
+from tensorflow.keras.losses import Reduction # type: ignore
+from tensorflow.keras.losses import MeanSquaredError, MeanAbsoluteError # type: ignore
+from tensorflow.keras.layers import (InputLayer, Dense, Flatten, Reshape, # type: ignore
                                      Conv1D, Conv1DTranspose, BatchNormalization)
 import keras.backend as K
 
