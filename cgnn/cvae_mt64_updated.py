@@ -652,8 +652,14 @@ def plot_lines(data, save2file=False, filename='./data.png', step=None,
     if legend_labels is not None:
         plt.legend(legend_labels, bbox_to_anchor=(1.02, 0.1), loc='upper left', borderaxespad=0)
     # plt.tight_layout(rect=[0, 0.03, 1, 0.95])
-    if step is not None:
+    if step == 16:
         plt.suptitle("Time Decay Curves")
+    if step == 15:
+        plt.suptitle('Test 1')
+    if step==14:
+        plt.suptitle('Test 2')
+    if step==13:
+        plt.suptitle('Test 3')
     if save2file:
         plt.savefig(filename)
         plt.draw()
