@@ -720,8 +720,8 @@ def compute_loss(network, xy, rel_noise=0):
     logpx_z = tf.cast(logpx_z, np.float32)
     logpz = tf.reduce_mean(log_normal_pdf(z, 0., 0.))
     logqz_x = tf.reduce_mean(log_normal_pdf(z, mean, logvar))
-    terms = (data_misfit, logpx_z, -network.beta_vae*(logpz - logqz_x))
-    loss = data_misfit + logpx_z - network.beta_vae*(logpz - logqz_x)
+    terms = (data_misfit*1e11, logpx_z, -network.beta_vae*(logpz - logqz_x))
+    loss = (data_misfit*1e11) + logpx_z - network.beta_vae*(logpz - logqz_x)
     return (loss, terms)
 
 
