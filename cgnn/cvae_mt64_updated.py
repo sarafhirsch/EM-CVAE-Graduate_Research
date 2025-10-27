@@ -707,12 +707,13 @@ def compute_loss(network, xy, rel_noise=0):
     x_tanh = network.decode(zd, apply_tanh=True)
     d_pre = tf.cast(network.predict_tanh(x_tanh), np.float32)
     # tf.print('d_true',d_true)
-    # tf.print('d_pre', d_pre*1e11)
+    # tf.print('d_pre', d_pre)
     dme = network.data_mean_error(tf.transpose(d_true),
                                   tf.transpose(tf.reshape(d_pre, (-1, network.n_time))),
                                   sample_weight=network.data_weights) # Down weight padded values (end of model)
     # tf.print(dme)
     data_misfit = tf.reduce_mean(dme)
+    data_misfit= data_misfit*1e11
     logpx_z = tf.reduce_mean(
         network.model_mean_error(tf.transpose(tf.reshape(x_tanh, (-1, network.n_model))),
                                  tf.transpose(tf.reshape(x, (-1, network.n_model))),
@@ -720,8 +721,9 @@ def compute_loss(network, xy, rel_noise=0):
     logpx_z = tf.cast(logpx_z, np.float32)
     logpz = tf.reduce_mean(log_normal_pdf(z, 0., 0.))
     logqz_x = tf.reduce_mean(log_normal_pdf(z, mean, logvar))
-    terms = (data_misfit*1e11, logpx_z, -network.beta_vae*(logpz - logqz_x))
-    loss = (data_misfit*1e11) + logpx_z - network.beta_vae*(logpz - logqz_x)
+    terms = (data_misfit, logpx_z, -network.beta_vae*(logpz - logqz_x))
+    loss = data_misfit + logpx_z - network.beta_vae*(logpz - logqz_x)
+    tf.print('loss', loss)
     return (loss, terms)
 
 
