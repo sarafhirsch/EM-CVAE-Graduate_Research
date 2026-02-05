@@ -723,7 +723,7 @@ def compute_loss(network, xy, rel_noise=0):
     logqz_x = tf.reduce_mean(log_normal_pdf(z, mean, logvar))
     terms = (data_misfit, logpx_z, -network.beta_vae*(logpz - logqz_x))
     loss = data_misfit + logpx_z - network.beta_vae*(logpz - logqz_x)
-    tf.print('loss', loss)
+    # tf.print('loss', loss)
     return (loss, terms)
 
 
@@ -750,7 +750,7 @@ def compute_reconstruction_loss(network, xy, rel_noise=0):
     # print(z)
     x_tanh = network.decode(zd, apply_tanh=True)
     # print(network.n_model)
-    # print(x_tanh.shape)
+    # tf.print(x_tanh.shape)
     # print(x.shape)
 
     dim = x.shape[0]
