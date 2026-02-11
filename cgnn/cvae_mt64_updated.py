@@ -86,37 +86,37 @@ class CVAE(Model):
 
         if model_loss_type == 'se':
             self.model_mean_error = MeanSquaredError(
-                reduction=Reduction.NONE)
-            self.model_weights = n_model/(model_std**2)
+                reduction=Reduction.NONE, dtype=tf.float32)
+            self.model_weights = tf.constant(n_model/(model_std**2), dtype=tf.float32)
         if model_loss_type == 'mse':
             self.model_mean_error = MeanSquaredError(
-                reduction=Reduction.NONE)
-            self.model_weights = 1/(model_std**2)
+                reduction=Reduction.NONE, dtype=tf.float32)
+            self.model_weights = tf.constant(1/(model_std**2), dtype=tf.float32)
         if model_loss_type == 'ae':
             self.model_mean_error = MeanAbsoluteError(
-                reduction=Reduction.NONE)
-            self.model_weights = n_model/model_std
+                reduction=Reduction.NONE, dtype=tf.float32)
+            self.model_weights = tf.constant(n_model/model_std, dtype=tf.float32)
         if model_loss_type == 'mae':
             self.model_mean_error = MeanAbsoluteError(
-                reduction=Reduction.NONE)
-            self.model_weights = 1/model_std
+                reduction=Reduction.NONE, dtype=tf.float32)
+            self.model_weights = tf.constant(1/model_std, dtype=tf.float32)
 
         if data_loss_type == 'se':
             self.data_mean_error = MeanSquaredError(
-                reduction=Reduction.NONE)
-            self.data_weights = n_data/(data_std**2)
+                reduction=Reduction.NONE, dtype=tf.float32)
+            self.data_weights = tf.constant(n_data/(data_std**2), dtype=tf.float32)
         if data_loss_type == 'mse':
             self.data_mean_error = MeanSquaredError(
-                reduction=Reduction.NONE)
-            self.data_weights = 1/(data_std**2)
+                reduction=Reduction.NONE, dtype=tf.float32)
+            self.data_weights = tf.constant(1/(data_std**2), dtype=tf.float32)
         if data_loss_type == 'ae':
             self.data_mean_error = MeanAbsoluteError(
-                reduction=Reduction.NONE)
-            self.data_weights = n_data/data_std
+                reduction=Reduction.NONE, dtype=tf.float32)
+            self.data_weights = tf.constant(n_data/data_std, dtype=tf.float32)
         if data_loss_type == 'mae':
             self.data_mean_error = MeanAbsoluteError(
-                reduction=Reduction.NONE)
-            self.data_weights = 1/data_std
+                reduction=Reduction.NONE, dtype=tf.float32)
+            self.data_weights = tf.constant(1/data_std, dtype=tf.float32)
 
         # initializer = tf.keras.initializers.HeNormal()
         # initializer = tf.keras.initializers.GlorotUniform()
@@ -146,11 +146,26 @@ class CVAE(Model):
                   ),
             # 4, depth=32
             Flatten(),
-            # No activation
-            Dense(latent_dim + latent_dim,
-                  kernel_initializer=initializer
-                 )
+            # # No activation
+            # Dense(latent_dim + latent_dim,
+            #       kernel_initializer=initializer
+            #      )
         ])
+
+        self.z_mean = Dense(
+            latent_dim,
+            name="z_mean",
+            dtype="float32",
+            kernel_initializer=initializer
+        )
+
+        self.z_logvar = Dense(
+            latent_dim,
+            name="z_logvar",
+            dtype="float32",
+            kernel_initializer=initializer
+        )
+
 
         self.generative_net = Sequential([
             InputLayer(input_shape=(latent_dim+n_time,)),
@@ -234,13 +249,28 @@ class CVAE(Model):
     def encode(self, x):
         # print(x)
         # print(self.inference_net.summary())
-        mean, logvar = tf.split(self.inference_net(
-            x), num_or_size_splits=2, axis=1)
-        return mean, logvar
+        h = self.inference_net(x)
+        return self.z_mean(h), self.z_logvar(h)
+        # mean, logvar = tf.split(self.inference_net(
+        #     x), num_or_size_splits=2, axis=1)
+        # z_mean = tf.keras.layers.Dense(20, name="z_mean", dtype="float32")(x)
 
+        # z_logvar = tf.keras.layers.Dense(20, name="z_logvar", dtype="float32")(x)
+        # return z_mean, z_logvar
     def reparameterize(self, mean, logvar):
-        eps = tf.random.normal(shape=mean.shape)
-        return eps * tf.exp(logvar * .5) + mean
+        mean = tf.cast(mean, tf.float32)
+        logvar = tf.cast(logvar, tf.float32)
+
+        eps = tf.random.normal(
+            shape=tf.shape(mean),
+            dtype=tf.float32
+        )
+
+        return mean + tf.exp(0.5 * logvar) * eps
+
+    # def reparameterize(self, mean, logvar):
+    #     eps = tf.random.normal(shape=tf.shape(mean))
+    #     return eps * tf.exp(logvar * .5) + mean
 
     def decode(self, z, apply_tanh=False):
         # print('z',z)
@@ -668,17 +698,29 @@ def plot_lines(data, save2file=False, filename='./data.png', step=None,
     else:
         plt.show()
 
+def log_normal_pdf(sample, mean, logvar):
+    sample = tf.cast(sample, tf.float32)
+    mean = tf.cast(mean, tf.float32)
+    logvar = tf.cast(logvar, tf.float32)
+
+    log2pi = tf.math.log(tf.constant(2. * np.pi, dtype=tf.float32))
+
+    return -0.5 * (
+        log2pi
+        + logvar
+        + tf.square(sample - mean) / tf.exp(logvar)
+    )
 
 
-def log_normal_pdf(sample, mean, logvar, raxis=1):
-    log2pi = tf.math.log(2. * np.pi)
-    return tf.reduce_sum(
-        -.5 * ((sample - mean) ** 2. * tf.exp(-logvar) + logvar + log2pi),
-        axis=raxis)
+# def log_normal_pdf(sample, mean, logvar, raxis=1):
+#     log2pi = tf.math.log(2. * np.pi)
+#     return tf.reduce_sum(
+#         -.5 * ((sample - mean) ** 2. * tf.exp(-logvar) + logvar + log2pi),
+#         axis=raxis)
 
 
 @tf.function
-def compute_loss(network, xy, rel_noise=0):
+def compute_loss(network, xy, beta, rel_noise=0):
     '''
     total loss function
     '''
@@ -713,16 +755,28 @@ def compute_loss(network, xy, rel_noise=0):
                                   sample_weight=network.data_weights) # Down weight padded values (end of model)
     # tf.print(dme)
     data_misfit = tf.reduce_mean(dme)
-    data_misfit= data_misfit*1e11
+    data_misfit = data_misfit * tf.constant(1e11, dtype=tf.float32)
+    # data_misfit= data_misfit*1e11
     logpx_z = tf.reduce_mean(
         network.model_mean_error(tf.transpose(tf.reshape(x_tanh, (-1, network.n_model))),
                                  tf.transpose(tf.reshape(x, (-1, network.n_model))),
                                  sample_weight=network.model_weights))
     logpx_z = tf.cast(logpx_z, np.float32)
-    logpz = tf.reduce_mean(log_normal_pdf(z, 0., 0.))
-    logqz_x = tf.reduce_mean(log_normal_pdf(z, mean, logvar))
-    terms = (data_misfit, logpx_z, -network.beta_vae*(logpz - logqz_x))
-    loss = data_misfit + logpx_z - network.beta_vae*(logpz - logqz_x)
+    # logpz = tf.reduce_mean(log_normal_pdf(z, 0., 0.))
+    # logqz_x = tf.reduce_mean(log_normal_pdf(z, mean, logvar))
+    logpz = tf.cast(
+        tf.reduce_mean(log_normal_pdf(z, 0., 0.)),
+        tf.float32)
+    logqz_x = tf.cast(
+        tf.reduce_mean(log_normal_pdf(z, mean, logvar)),
+        tf.float32)
+    # beta = tf.cast(network.beta_vae, tf.float32)
+    # tf.print('data misfit', data_misfit)
+    # tf.print('reconstruction', logpx_z)
+    # tf.print("KL", -beta*(logpz-logqz_x))
+    # tf.print('beta',beta)
+    terms = (data_misfit, logpx_z, -beta*(logpz - logqz_x))
+    loss = tf.cast(data_misfit + logpx_z - beta*(logpz - logqz_x), tf.float32)
     # tf.print('loss', loss)
     return (loss, terms)
 
@@ -776,17 +830,27 @@ def compute_reconstruction_loss(network, xy, rel_noise=0):
 
 
 @tf.function
-def compute_apply_gradients(network, xy, optimizer, use_data_misfit=True, rel_noise=0):
+def compute_apply_gradients(network, xy, optimizer, beta, use_data_misfit=True, rel_noise=0):
     with tf.GradientTape() as tape:
         if use_data_misfit:
-            loss, terms = compute_loss(network, xy, rel_noise=rel_noise)
+            loss, terms = compute_loss(network, xy, beta, rel_noise=rel_noise)
+            loss = tf.cast(loss, tf.float32)
         else:
             print('reconstruction')
             loss, terms = compute_reconstruction_loss(network, xy, rel_noise=rel_noise)
+            loss = tf.cast(loss, tf.float32)
+
+    tf.debugging.assert_type(loss, tf.float32)
+    gradients = tape.gradient(loss, network.trainable_variables)
+    # for g in gradients:
+    #     if g is not None:
+    #         print(tf.norm(g).numpy())
+
+    optimizer.apply_gradients(zip(gradients, network.trainable_variables))
     # print('loss',loss)
     # print(network.trainable_variables)
-    gradients = tape.gradient(loss, network.trainable_variables)
-    optimizer.apply_gradients(zip(gradients, network.trainable_variables))
+    # gradients = tape.gradient(loss, network.trainable_variables)
+    # optimizer.apply_gradients(zip(gradients, network.trainable_variables))
     return (loss, terms)
 
 
