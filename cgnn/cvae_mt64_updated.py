@@ -836,7 +836,7 @@ def compute_apply_gradients(network, xy, optimizer, beta, use_data_misfit=True, 
             loss, terms = compute_loss(network, xy, beta, rel_noise=rel_noise)
             loss = tf.cast(loss, tf.float32)
         else:
-            print('reconstruction')
+            # print('reconstruction')
             loss, terms = compute_reconstruction_loss(network, xy, rel_noise=rel_noise)
             loss = tf.cast(loss, tf.float32)
 
