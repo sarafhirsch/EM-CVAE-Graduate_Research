@@ -750,13 +750,25 @@ def compute_loss(network, xy, beta, rel_noise=0):
     d_pre = tf.cast(network.predict_tanh(x_tanh), np.float32)
     # tf.print('d_true',d_true)
     # tf.print('d_pre', d_pre)
-    dme = network.data_mean_error(tf.transpose(d_true),
-                                  tf.transpose(tf.reshape(d_pre, (-1, network.n_time))),
-                                  sample_weight=network.data_weights) # Down weight padded values (end of model)
+    eps = 1e-12
+
+    d_true_norm = d_true / (tf.abs(d_true) + eps)
+    d_pre_norm  = d_pre  / (tf.abs(d_true) + eps)
+
+    dme = network.data_mean_error(
+        tf.transpose(d_true_norm),
+        tf.transpose(tf.reshape(d_pre_norm, (-1, network.n_time))),
+        sample_weight=network.data_weights
+    )
+    # dme = network.data_mean_error(tf.transpose(d_true),
+    #                               tf.transpose(tf.reshape(d_pre, (-1, network.n_time))),
+    #                               sample_weight=network.data_weights) # Down weight padded values (end of model)
     # tf.print(dme)
     data_misfit = tf.reduce_mean(dme)
-    data_misfit = data_misfit * tf.constant(1e11, dtype=tf.float32)
-    # data_misfit= data_misfit*1e11
+    #Unit correction
+    # data_misfit = data_misfit * tf.constant(1e11, dtype=tf.float32)
+    # lambda_data = 10S
+    # data_misfit *= lambda_data
     logpx_z = tf.reduce_mean(
         network.model_mean_error(tf.transpose(tf.reshape(x_tanh, (-1, network.n_model))),
                                  tf.transpose(tf.reshape(x, (-1, network.n_model))),
@@ -775,8 +787,9 @@ def compute_loss(network, xy, beta, rel_noise=0):
     # tf.print('reconstruction', logpx_z)
     # tf.print("KL", -beta*(logpz-logqz_x))
     # tf.print('beta',beta)
-    terms = (data_misfit, logpx_z, -beta*(logpz - logqz_x))
-    loss = tf.cast(data_misfit + logpx_z - beta*(logpz - logqz_x), tf.float32)
+    kl = logqz_x - logpz
+    terms = (data_misfit, logpx_z, beta*kl)
+    loss = tf.cast(data_misfit + logpx_z + beta*kl, tf.float32)
     # tf.print('loss', loss)
     return (loss, terms)
 
