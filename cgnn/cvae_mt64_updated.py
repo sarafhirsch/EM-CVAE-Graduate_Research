@@ -733,31 +733,32 @@ def compute_loss(network, xy, beta, rel_noise=0):
     d_true = network.input_to_data(d_input)
     if rel_noise > 0:
         d_input = network.data_input_noise(d_input, rel_noise)
-    # d_true = -tf.exp(d_input)
-    # d_true = tf.cast(network.predict_tanh(x), np.float32)
-    # Add noise to d_true
-    # eps = tf.random.normal(shape=d_true.shape)
-    # d_true += eps*network.data_std
-    # d_true_log = tf.math.log(-d_true)
+
     mean, logvar = network.encode(x)
-    # print('x', x)
+
     z = network.reparameterize(mean, logvar)
-    # print('z', z)
-    # print('d_input',d_input)
-    # tf.print('z', z)
+
+    # drop_prob = 0.3
+
+    # mask = tf.cast(
+    #     tf.random.uniform(tf.shape(z)) > drop_prob,
+    #     tf.float32
+    # )
+
+    # z = z * mask
+
     zd = tf.concat((z, d_input), -1)
     x_tanh = network.decode(zd, apply_tanh=True)
     d_pre = tf.cast(network.predict_tanh(x_tanh), np.float32)
-    # tf.print('d_true',d_true)
-    # tf.print('d_pre', d_pre)
+  
     eps = 1e-12
 
-    d_true_norm = d_true / (tf.abs(d_true) + eps)
-    d_pre_norm  = d_pre  / (tf.abs(d_true) + eps)
+    d_true_log = tf.math.log(tf.abs(d_true) + eps)
+    d_pre_log  = tf.math.log(tf.abs(d_pre) + eps)
 
     dme = network.data_mean_error(
-        tf.transpose(d_true_norm),
-        tf.transpose(tf.reshape(d_pre_norm, (-1, network.n_time))),
+        tf.transpose(d_true_log),
+        tf.transpose(tf.reshape(d_pre_log, (-1, network.n_time))),
         sample_weight=network.data_weights
     )
     # dme = network.data_mean_error(tf.transpose(d_true),
@@ -765,9 +766,10 @@ def compute_loss(network, xy, beta, rel_noise=0):
     #                               sample_weight=network.data_weights) # Down weight padded values (end of model)
     # tf.print(dme)
     data_misfit = tf.reduce_mean(dme)
+    # data_misfit = tf.clip_by_value(data_misfit, 0.0, 1000.0)
     #Unit correction
     # data_misfit = data_misfit * tf.constant(1e11, dtype=tf.float32)
-    # lambda_data = 10S
+    # lambda_data = 10
     # data_misfit *= lambda_data
     logpx_z = tf.reduce_mean(
         network.model_mean_error(tf.transpose(tf.reshape(x_tanh, (-1, network.n_model))),
