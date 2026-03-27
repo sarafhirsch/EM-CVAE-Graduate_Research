@@ -738,16 +738,16 @@ def compute_loss(network, xy, beta, rel_noise=0):
 
     z = network.reparameterize(mean, logvar)
 
-    # drop_prob = 0.3
+    drop_prob = 0.3
 
-    # mask = tf.cast(
-    #     tf.random.uniform(tf.shape(z)) > drop_prob,
-    #     tf.float32
-    # )
+    mask = tf.cast(
+        tf.random.uniform(tf.shape(z)) > drop_prob,
+        tf.float32
+    )
 
-    # z = z * mask
+    z_dropped = z * mask
 
-    zd = tf.concat((z, d_input), -1)
+    zd = tf.concat((z_dropped, d_input), -1)
     x_tanh = network.decode(zd, apply_tanh=True)
     d_pre = tf.cast(network.predict_tanh(x_tanh), np.float32)
   
