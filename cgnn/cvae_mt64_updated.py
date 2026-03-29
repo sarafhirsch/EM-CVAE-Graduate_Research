@@ -746,8 +746,9 @@ def compute_loss(network, xy, beta, rel_noise=0):
     )
 
     z_dropped = z * mask
+    alpha = 2
 
-    zd = tf.concat((z_dropped, d_input), -1)
+    zd = tf.concat((z_dropped, d_input*alpha), -1)
     x_tanh = network.decode(zd, apply_tanh=True)
     d_pre = tf.cast(network.predict_tanh(x_tanh), np.float32)
   
@@ -769,8 +770,8 @@ def compute_loss(network, xy, beta, rel_noise=0):
     # data_misfit = tf.clip_by_value(data_misfit, 0.0, 1000.0)
     #Unit correction
     # data_misfit = data_misfit * tf.constant(1e11, dtype=tf.float32)
-    lambda_data = 2
-    data_misfit *= lambda_data
+    # lambda_data = 2
+    # data_misfit *= lambda_data
     logpx_z = tf.reduce_mean(
         network.model_mean_error(tf.transpose(tf.reshape(x_tanh, (-1, network.n_model))),
                                  tf.transpose(tf.reshape(x, (-1, network.n_model))),
