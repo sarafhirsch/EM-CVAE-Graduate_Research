@@ -762,14 +762,7 @@ def compute_loss(network, xy, beta, rel_noise=0):
         tf.transpose(tf.reshape(d_pre_log, (-1, network.n_time))),
         sample_weight=network.data_weights
     )
-    # dme = network.data_mean_error(tf.transpose(d_true),
-    #                               tf.transpose(tf.reshape(d_pre, (-1, network.n_time))),
-    #                               sample_weight=network.data_weights) # Down weight padded values (end of model)
-    # tf.print(dme)
     data_misfit = tf.reduce_mean(dme)
-    # data_misfit = tf.clip_by_value(data_misfit, 0.0, 1000.0)
-    #Unit correction
-    # data_misfit = data_misfit * tf.constant(1e11, dtype=tf.float32)
     # lambda_data = 2
     # data_misfit *= lambda_data
     logpx_z = tf.reduce_mean(
@@ -777,19 +770,13 @@ def compute_loss(network, xy, beta, rel_noise=0):
                                  tf.transpose(tf.reshape(x, (-1, network.n_model))),
                                  sample_weight=network.model_weights))
     logpx_z = tf.cast(logpx_z, np.float32)
-    # logpz = tf.reduce_mean(log_normal_pdf(z, 0., 0.))
-    # logqz_x = tf.reduce_mean(log_normal_pdf(z, mean, logvar))
     logpz = tf.cast(
         tf.reduce_mean(log_normal_pdf(z, 0., 0.)),
         tf.float32)
     logqz_x = tf.cast(
         tf.reduce_mean(log_normal_pdf(z, mean, logvar)),
         tf.float32)
-    # beta = tf.cast(network.beta_vae, tf.float32)
-    # tf.print('data misfit', data_misfit)
-    # tf.print('reconstruction', logpx_z)
-    # tf.print("KL", -beta*(logpz-logqz_x))
-    # tf.print('beta',beta)
+  
     kl = logqz_x - logpz
     terms = (data_misfit, logpx_z, beta*kl)
     loss = tf.cast(data_misfit + logpx_z + beta*kl, tf.float32)
@@ -798,7 +785,7 @@ def compute_loss(network, xy, beta, rel_noise=0):
 
 
 @tf.function
-def compute_reconstruction_loss(network, xy, rel_noise=0):
+def compute_reconstruction_loss(network, xy, beta, rel_noise=0):
     '''
     No data misfit
     rel_noise is noise relative to network.data_std
@@ -810,38 +797,41 @@ def compute_reconstruction_loss(network, xy, rel_noise=0):
         # d_input += tf.math.log(abs(1 + rel_noise*network.data_std.flatten()[None, :]*tf.random.normal(shape=d_input.shape)))
         # d_input += rel_noise*network.data_std.flatten()[None, :]*tf.random.normal(shape=y.shape)
         d_input = network.data_input_noise(d_input, rel_noise)
-    # d_true = tf.math.log(-tf.cast(network.predict_tanh(x), np.float32))
-    # d_true = tf.cast(network.predict_tanh(x), np.float32)
-    # print('x',x)
-    # print('d_input',d_input)
+   
     mean, logvar = network.encode(x)
     z = network.reparameterize(mean, logvar)
-    zd = tf.concat((z, d_input), -1)
+
+    drop_prob = 0.3
+
+    mask = tf.cast(
+        tf.random.uniform(tf.shape(z)) > drop_prob,
+        tf.float32
+    )
+
+    z_dropped = z * mask
+    alpha = 2
+
+    zd = tf.concat((z_dropped, d_input*alpha), -1)
+    # zd = tf.concat((z, d_input), -1)
     # print(z)
     x_tanh = network.decode(zd, apply_tanh=True)
-    # print(network.n_model)
-    # tf.print(x_tanh.shape)
-    # print(x.shape)
-
-    dim = x.shape[0]
-    # x_tanh1 = tf.slice(x_tanh, [0,0,0], [dim,30,1])
-    # print('network n_model:',network.n_model-2)
-    # print('x_tanh:',x_tanh1.shape)
-    # print(x_tanh[0])
-    # print(x_tanh1[0])
-    # print('x:',x.shape)
-    # print('x_tanh tensor:',tf.transpose(tf.reshape(x_tanh1, (-1, network.n_model-2))))
-    # print('x tensor:',tf.transpose(tf.reshape(x, (-1, network.n_model-2))))
+ 
     logpx_z = tf.reduce_mean(
         network.model_mean_error(tf.reshape(x_tanh, (-1, network.n_model)),
                                  tf.reshape(x, (-1, network.n_model)),
         # sample_weight=(network.n_model)/(network.model_std**2))
         sample_weight=network.model_weights))
     logpx_z = tf.cast(logpx_z, np.float32) # Reconstruction
-    logpz = tf.reduce_mean(log_normal_pdf(z, 0., 0.))
-    logqz_x = tf.reduce_mean(log_normal_pdf(z, mean, logvar))
-    loss =  logpx_z - network.beta_vae*(logpz - logqz_x) #Reconstruction - KL divergence
-    terms = (logpx_z, network.beta_vae*(logqz_x - logpz))
+    logpz = tf.cast(
+        tf.reduce_mean(log_normal_pdf(z, 0., 0.)),
+        tf.float32)
+    logqz_x = tf.cast(
+        tf.reduce_mean(log_normal_pdf(z, mean, logvar)),
+        tf.float32)
+
+    kl = logqz_x - logpz
+    loss =  tf.cast((logpx_z + beta*kl), tf.float32) #Reconstruction - KL divergence
+    terms = (logpx_z, beta*kl)
     return (loss, terms)
 
 
@@ -853,7 +843,7 @@ def compute_apply_gradients(network, xy, optimizer, beta, use_data_misfit=True, 
             loss = tf.cast(loss, tf.float32)
         else:
             # print('reconstruction')
-            loss, terms = compute_reconstruction_loss(network, xy, rel_noise=rel_noise)
+            loss, terms = compute_reconstruction_loss(network, xy, beta, rel_noise=rel_noise)
             loss = tf.cast(loss, tf.float32)
 
     tf.debugging.assert_type(loss, tf.float32)
@@ -881,7 +871,20 @@ def compute_losses(network, xy):
     # d_true = tf.cast(network.predict_tanh(x), np.float32)
     mean, logvar = network.encode(x)
     z = network.reparameterize(mean, logvar)
-    zd = tf.concat((z, d_input), -1)
+
+    drop_prob = 0.3
+
+    mask = tf.cast(
+        tf.random.uniform(tf.shape(z)) > drop_prob,
+        tf.float32
+    )
+
+    z_dropped = z * mask
+    alpha = 2
+
+    zd = tf.concat((z_dropped, d_input*alpha), -1)
+
+    # zd = tf.concat((z, d_input), -1)
     x_tanh = network.decode(zd, apply_tanh=True)
     d_pre = tf.cast(network.predict_tanh(x_tanh), np.float32)
     # d_pre = tf.math.log(-tf.cast(network.predict_tanh(x_tanh), np.float32))
